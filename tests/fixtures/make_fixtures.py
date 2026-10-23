@@ -58,7 +58,10 @@ for pid in sorted(truth):
         "mudline": float(mudline),
         "log": {
             "elevation": L.elevation[m].tolist(),
-            "stroke": pile.bpm_to_stroke(L.bpm)[m].tolist(),
+            # The research reader's bpm column holds the stroke in feet on
+            # logs whose inspector recorded stroke; its bpm_to_stroke passes
+            # values under 25 through unchanged.
+            ("stroke" if max(L.bpm) < 25 else "bpm"): L.bpm[m].tolist(),
             "bpf": L.bpf[m].tolist(),
         },
         "fines": {"elevation": [e for e, _ in fines], "fines": [f for _, f in fines]},

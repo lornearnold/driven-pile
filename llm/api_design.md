@@ -1,7 +1,8 @@
 # driven-pile: public API design
 
 Status: revised 2026-10-23 after review; implemented the same day in
-`src/driven_pile/`.
+`src/driven_pile/`. Revised again 2026-10-23: `DriveLog` carries its `Pile`
+and `Hammer` (decision 8).
 Equation numbers refer to the ASCE 2027 manuscript Methods section.
 
 ## 1. Scope and principles
@@ -44,24 +45,32 @@ Mirrors the research repo's `PileLog`, less the site-specific fields
 @dataclass
 class DriveLog:
     pile_id: str
+    pile: Pile                 # the pile that was driven
+    hammer: Hammer             # the hammer that drove it
     elevation: np.ndarray      # ft, toe elevation at the end of each logged foot
     bpm: np.ndarray            # hammer blows per minute
     bpf: np.ndarray            # blows per foot
-    valid: np.ndarray          # bool, True where elevation, bpm and bpf are all finite
 
+    @property
+    def valid(self) -> np.ndarray       # bool, True where elevation, bpm and bpf are all finite
     @property
     def stroke(self) -> np.ndarray      # ft, from bpm via free-fall timing
     @property
     def depth(self) -> np.ndarray       # ft below the first logged foot
 
     @classmethod
-    def from_arrays(cls, pile_id, bpm, bpf, *, elevation=None,
-                    depth=None, tip_elevation=None) -> "DriveLog"
+    def from_arrays(cls, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+                    elevation=None, depth=None, tip_elevation=None,
+                    forward_fill=False) -> "DriveLog"
     @classmethod
-    def from_csv(cls, path, *, pile_id, bpm="bpm", bpf="bpf",
-                 elevation=None, depth=None, tip_elevation=None,
-                 skiprows=0) -> "DriveLog"
+    def from_csv(cls, path, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+                 elevation=None, depth=None, tip_elevation=None, skiprows=0,
+                 forward_fill=False) -> "DriveLog"
 ```
+
+A log cannot exist without the pile and hammer that produced it, so both are
+required to construct one. `Pile` and `Hammer` stay separate classes because
+one hammer, and often one section, is shared across a project's logs.
 
 - Elevation is either given directly or built from `depth` and
   `tip_elevation` as `tip_elevation + depth[-1] - depth`, the same rule the
@@ -72,9 +81,17 @@ class DriveLog:
   bpf=2, tip_elevation=..., skiprows=4)`. There is no site-specific reader.
 - Non-numeric cells become NaN and the log is trimmed to the first and last
   rows where bpm and bpf are both numeric. `valid` marks finite rows inside
-  that span.
-- `bpm_to_stroke(bpm)` is a public function (free-fall stroke from the time
-  between blows for an open-ended diesel hammer).
+  that span. `forward_fill` carries the last recorded rate over unrecorded
+  feet inside the span.
+- The log stores bpm and bpf; `stroke` is a derived property. A log whose
+  inspector recorded the stroke in feet instead of the blow rate (10 of the
+  15 Pier 4 benchmark logs) is loaded with `stroke=` and converted to bpm on
+  input with `stroke_to_bpm`, the exact inverse of `bpm_to_stroke`. The
+  caller says which it is; the package does not guess from magnitude the
+  way the research reader does.
+- `bpm_to_stroke(bpm)` and `stroke_to_bpm(stroke)` are public functions
+  (free-fall stroke from the time between blows for an open-ended diesel
+  hammer, and its inverse).
 
 ### 3.2 `Pile`
 
@@ -197,27 +214,28 @@ The top-segment phi is always drawn uniform over the admissible band.
 ## 4. Pipeline functions
 
 ```python
-def prepare_target(log, pile, hammer, site, options) -> Target
+def prepare_target(log, site, options) -> Target
     # Eq. 1 per foot, Savitzky-Golay smoothing, tip anchor, extension of the
     # grid up to the mudline (unlogged top segment), sigma'_v0 profile, fines on grid.
 
-def sweep_top_phi(target, pile, site, options) -> TopPhiBand
+def sweep_top_phi(target, site, options) -> TopPhiBand
     # constant-phi sweep over [phi_lo, phi_hi]; returns lo, hi and the RMS curve
 
-def run_drive(target, pile, site, options, top_phi: float) -> DriveResult
+def run_drive(target, site, options, top_phi: float) -> DriveResult
     # the top-down marching solve, per-foot characterization
 
 def long_term_capacity(result) -> tuple[float, float]
     # (shaft_kips, toe_eod_kips); toe is the end-of-drive value, no toe setup
 
-def monte_carlo(log, pile, hammer, site, options, mc_options) -> McResult
+def monte_carlo(log, site, options, mc_options) -> McResult
 
-def analyze(log, pile, hammer, site, options=None, mc_options=None,
-            run_mc=False) -> Analysis
+def analyze(log, site, options=None, mc_options=None, run_mc=False) -> Analysis
 ```
 
-`Target` is a public dataclass (elevation, capacity, bpf, fines, sigma_v0,
-n_top) so a user can inspect or replace the capacity target. The
+`Target` is a public dataclass (pile, elevation, capacity, bpf, fines,
+sigma_v0, n_top) so a user can inspect or replace the capacity target. It
+carries the pile forward from the log so the later stages need only the
+target and the site. The
 deterministic `analyze` uses the lowest admissible top-segment phi.
 
 ## 5. Results
@@ -342,3 +360,6 @@ same phi, and checks the admissible band itself against the frozen one.
 5. Monte Carlo is off by default in `analyze`.
 6. Results are dataclasses of plain numpy arrays; no table wrapper, no pandas.
 7. The deterministic top-segment phi is the lowest admissible value.
+8. `DriveLog` requires a `Pile` and a `Hammer` (Lorne, 2026-10-23): a log
+   cannot exist without them. `Target` carries the pile, so every pipeline
+   function after the log takes only `(log or target, site, options)`.

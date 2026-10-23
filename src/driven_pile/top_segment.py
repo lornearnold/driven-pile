@@ -9,13 +9,12 @@ from .options import ModelOptions
 from .results import TopPhiBand
 
 
-def sweep_top_phi(target, pile, site, options=None):
+def sweep_top_phi(target, site, options=None):
     """Sweep a constant top-segment friction angle and find the admissible band.
 
     Parameters
     ----------
     target : Target
-    pile : Pile
     site : Site
     options : ModelOptions, optional
         Supplies the sweep range, step and tolerances.
@@ -31,7 +30,7 @@ def sweep_top_phi(target, pile, site, options=None):
     options = options or ModelOptions()
     step = options.top_sweep_step
     phis = np.arange(options.phi_lo, options.phi_hi + 0.5 * step, step)
-    rms = np.array([run_drive(target, pile, site, options, top_phi=float(p)).rms_kips
+    rms = np.array([run_drive(target, site, options, top_phi=float(p)).rms_kips
                     for p in phis])
     k = int(np.argmin(rms))
     ok = rms <= rms[k] + max(options.top_sweep_tol_frac * rms[k], options.top_sweep_tol_kips)

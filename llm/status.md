@@ -34,9 +34,18 @@ Last updated 2026-10-23.
 
 ## Uncommitted
 
-Everything after the first scaffold commit is uncommitted in the working
-tree: the whole package, tests, fixtures, CI workflow, README and design-doc
-updates, uv.lock. Lorne commits.
+API revision of 2026-10-23 (design decision 8): `DriveLog` now requires a
+`Pile` and `Hammer`; `prepare_target`, `sweep_top_phi`, `run_drive`,
+`monte_carlo` and `analyze` take `(log or target, site, ...)` with no
+separate pile or hammer argument; `Target` carries the pile. `DriveLog`
+stores bpm and bpf as the design specified, with stroke a derived property
+(the first port had stored stroke). Regenerating the fixtures showed why:
+the research reader's bpm column holds stroke in feet on 10 of the 15
+benchmark logs, passed through by a magnitude check in its `bpm_to_stroke`.
+The package takes `stroke=` explicitly and inverts it with `stroke_to_bpm`;
+fixtures now carry whichever column the research log has. README and
+docs/api_design.md updated; the paper citation was removed from the README.
+Tests pass (68 fast), lint clean. Lorne commits.
 
 ## Known differences from the research code, by design
 

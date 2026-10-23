@@ -36,6 +36,24 @@ def bpm_to_stroke(bpm):
     return G_FT_S2 / 2.0 * (t / 2.0) ** 2
 
 
+def stroke_to_bpm(stroke):
+    """Blow rate of a free-falling ram from its stroke; inverse of `bpm_to_stroke`.
+
+    Parameters
+    ----------
+    stroke : array_like
+        Stroke (drop height), ft.
+
+    Returns
+    -------
+    ndarray
+        Hammer blows per minute.
+    """
+    stroke = np.asarray(stroke, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return 60.0 / (4.0 * np.sqrt(stroke / (2.0 * G_FT_S2)))
+
+
 def _to_float(values):
     """Parse a sequence of cells to floats, NaN where a cell is not a number."""
     out = np.full(len(values), np.nan)
@@ -62,179 +80,6 @@ def _forward_fill(x):
         else:
             x[i] = last
     return x
-
-
-@dataclass
-class DriveLog:
-    """A pile-driving record, one entry per logged foot.
-
-    Attributes
-    ----------
-    pile_id : str
-        Identifier of the pile.
-    elevation : ndarray
-        Toe elevation at the end of each logged foot, ft.
-    bpf : ndarray
-        Blows per foot.
-    stroke : ndarray
-        Hammer stroke (drop height), ft.
-    bpm : ndarray or None
-        Hammer blows per minute as recorded, when the stroke was derived
-        from it; None when the stroke was recorded directly.
-    """
-
-    pile_id: str
-    elevation: np.ndarray
-    bpf: np.ndarray
-    stroke: np.ndarray
-    bpm: np.ndarray | None = None
-
-    def __post_init__(self):
-        self.elevation = np.asarray(self.elevation, dtype=float)
-        self.bpf = np.asarray(self.bpf, dtype=float)
-        self.stroke = np.asarray(self.stroke, dtype=float)
-        n = len(self.elevation)
-        if len(self.bpf) != n or len(self.stroke) != n:
-            raise ValueError("elevation, bpf and stroke must have the same length")
-        if self.bpm is not None:
-            self.bpm = np.asarray(self.bpm, dtype=float)
-            if len(self.bpm) != n:
-                raise ValueError("bpm must have the same length as elevation")
-
-    @property
-    def valid(self) -> np.ndarray:
-        """Boolean mask of feet with finite elevation, stroke and blow count."""
-        return np.isfinite(self.elevation) & np.isfinite(self.stroke) & np.isfinite(self.bpf)
-
-    @property
-    def depth(self) -> np.ndarray:
-        """Depth below the first logged foot, ft."""
-        return np.nanmax(self.elevation) - self.elevation
-
-    @classmethod
-    def from_arrays(cls, pile_id, bpf, *, stroke=None, bpm=None, elevation=None,
-                    depth=None, tip_elevation=None, forward_fill_stroke=False):
-        """Build a log from per-foot arrays.
-
-        Parameters
-        ----------
-        pile_id : str
-            Identifier of the pile.
-        bpf : array_like
-            Blows per foot. Non-numeric entries become NaN.
-        stroke, bpm : array_like, optional
-            Hammer stroke (ft) or blow rate (blows per minute). Exactly one
-            must be given; the stroke is derived from ``bpm`` with
-            `bpm_to_stroke`.
-        elevation : array_like, optional
-            Toe elevation at the end of each foot, ft.
-        depth, tip_elevation : array_like and float, optional
-            Depth of each foot (ft) and the final toe elevation (ft), used
-            instead of ``elevation``. The elevation of each foot is
-            ``tip_elevation + depth[-1] - depth`` after trimming.
-        forward_fill_stroke : bool, default False
-            Carry the last recorded stroke (or blow rate) forward over
-            unrecorded feet.
-
-        Returns
-        -------
-        DriveLog
-            The log trimmed to the span from the first to the last foot where
-            both the stroke and the blow count are recorded.
-        """
-        if (stroke is None) == (bpm is None):
-            raise ValueError("give exactly one of stroke or bpm")
-        if (elevation is None) == (depth is None):
-            raise ValueError("give exactly one of elevation or depth")
-        if depth is not None and tip_elevation is None:
-            raise ValueError("tip_elevation is required with depth")
-
-        bpf = _to_float(bpf)
-        source = _to_float(stroke if stroke is not None else bpm)
-        if forward_fill_stroke:
-            source = _forward_fill(source)
-        n = len(bpf)
-        if len(source) != n:
-            raise ValueError("bpf and stroke/bpm must have the same length")
-
-        both = np.isfinite(bpf) & np.isfinite(source)
-        idx = np.where(both)[0]
-        if idx.size == 0:
-            raise ValueError("no foot has both a stroke and a blow count")
-        sl = slice(idx[0], idx[-1] + 1)
-        bpf, source = bpf[sl], source[sl]
-
-        if elevation is not None:
-            elevation = _to_float(elevation)
-            if len(elevation) != n:
-                raise ValueError("elevation must have the same length as bpf")
-            elevation = elevation[sl]
-        else:
-            depth = _to_float(depth)
-            if len(depth) != n:
-                raise ValueError("depth must have the same length as bpf")
-            depth = depth[sl]
-            elevation = float(tip_elevation) + depth[-1] - depth
-
-        if bpm is not None:
-            return cls(pile_id, elevation, bpf, bpm_to_stroke(source), bpm=source)
-        return cls(pile_id, elevation, bpf, source)
-
-    @classmethod
-    def from_csv(cls, path, pile_id, *, bpf, stroke=None, bpm=None, elevation=None,
-                 depth=None, tip_elevation=None, skiprows=0, delimiter=",",
-                 forward_fill_stroke=False):
-        """Read a log from a delimited text file.
-
-        Parameters
-        ----------
-        path : str or Path
-            File to read.
-        pile_id : str
-            Identifier of the pile.
-        bpf, stroke, bpm, elevation, depth : str or int
-            Column holding each quantity, by header name or zero-based index.
-            Exactly one of ``stroke``/``bpm`` and one of
-            ``elevation``/``depth`` must be given.
-        tip_elevation : float, optional
-            Final toe elevation, ft; required with ``depth``.
-        skiprows : int, default 0
-            Lines to skip before the data (or before the header row when
-            columns are named).
-        delimiter : str, default ","
-            Field delimiter.
-        forward_fill_stroke : bool, default False
-            See `from_arrays`.
-
-        Returns
-        -------
-        DriveLog
-        """
-        specs = {"bpf": bpf, "stroke": stroke, "bpm": bpm,
-                 "elevation": elevation, "depth": depth}
-        given = {k: v for k, v in specs.items() if v is not None}
-        with open(Path(path), newline="", encoding="utf-8-sig") as fh:
-            rows = [r for r in csv.reader(fh, delimiter=delimiter)]
-        rows = rows[skiprows:]
-        if any(isinstance(v, str) for v in given.values()):
-            header = [h.strip() for h in rows[0]]
-            rows = rows[1:]
-            for k, v in given.items():
-                if isinstance(v, str):
-                    if v not in header:
-                        raise ValueError(f"column {v!r} not found in header {header}")
-                    given[k] = header.index(v)
-        rows = [r for r in rows if any(c.strip() for c in r)]
-
-        def column(j):
-            return [r[j] if j < len(r) else "" for r in rows]
-
-        cols = {k: column(j) for k, j in given.items()}
-        return cls.from_arrays(
-            pile_id, cols["bpf"], stroke=cols.get("stroke"), bpm=cols.get("bpm"),
-            elevation=cols.get("elevation"), depth=cols.get("depth"),
-            tip_elevation=tip_elevation, forward_fill_stroke=forward_fill_stroke,
-        )
 
 
 @dataclass(frozen=True)
@@ -295,6 +140,192 @@ class Hammer:
     """
 
     ram_weight: float
+
+
+@dataclass
+class DriveLog:
+    """A pile-driving record, one entry per logged foot.
+
+    Attributes
+    ----------
+    pile_id : str
+        Identifier of the pile.
+    pile : Pile
+        The pile that was driven.
+    hammer : Hammer
+        The hammer that drove it.
+    elevation : ndarray
+        Toe elevation at the end of each logged foot, ft.
+    bpm : ndarray
+        Hammer blows per minute.
+    bpf : ndarray
+        Blows per foot.
+    """
+
+    pile_id: str
+    pile: Pile
+    hammer: Hammer
+    elevation: np.ndarray
+    bpm: np.ndarray
+    bpf: np.ndarray
+
+    def __post_init__(self):
+        self.elevation = np.asarray(self.elevation, dtype=float)
+        self.bpm = np.asarray(self.bpm, dtype=float)
+        self.bpf = np.asarray(self.bpf, dtype=float)
+        n = len(self.elevation)
+        if len(self.bpm) != n or len(self.bpf) != n:
+            raise ValueError("elevation, bpm and bpf must have the same length")
+
+    @property
+    def stroke(self) -> np.ndarray:
+        """Hammer stroke (drop height) derived from the blow rate, ft."""
+        return bpm_to_stroke(self.bpm)
+
+    @property
+    def valid(self) -> np.ndarray:
+        """Boolean mask of feet with finite elevation, blow rate and blow count."""
+        return np.isfinite(self.elevation) & np.isfinite(self.bpm) & np.isfinite(self.bpf)
+
+    @property
+    def depth(self) -> np.ndarray:
+        """Depth below the first logged foot, ft."""
+        return np.nanmax(self.elevation) - self.elevation
+
+    @classmethod
+    def from_arrays(cls, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+                    elevation=None, depth=None, tip_elevation=None,
+                    forward_fill=False):
+        """Build a log from per-foot arrays.
+
+        Parameters
+        ----------
+        pile_id : str
+            Identifier of the pile.
+        pile : Pile
+            The pile that was driven.
+        hammer : Hammer
+            The hammer that drove it.
+        bpf : array_like
+            Blows per foot. Non-numeric entries become NaN.
+        bpm : array_like, optional
+            Hammer blows per minute. Non-numeric entries become NaN.
+        stroke : array_like, optional
+            Hammer stroke, ft, for a log that records the stroke instead of
+            the blow rate; converted to bpm with `stroke_to_bpm`. Exactly
+            one of ``bpm`` and ``stroke`` must be given.
+        elevation : array_like, optional
+            Toe elevation at the end of each foot, ft.
+        depth, tip_elevation : array_like and float, optional
+            Depth of each foot (ft) and the final toe elevation (ft), used
+            instead of ``elevation``. The elevation of each foot is
+            ``tip_elevation + depth[-1] - depth`` after trimming.
+        forward_fill : bool, default False
+            Carry the last recorded blow rate (or stroke) forward over
+            unrecorded feet.
+
+        Returns
+        -------
+        DriveLog
+            The log trimmed to the span from the first to the last foot where
+            both the blow rate and the blow count are recorded.
+        """
+        if (bpm is None) == (stroke is None):
+            raise ValueError("give exactly one of bpm or stroke")
+        if (elevation is None) == (depth is None):
+            raise ValueError("give exactly one of elevation or depth")
+        if depth is not None and tip_elevation is None:
+            raise ValueError("tip_elevation is required with depth")
+
+        bpm = _to_float(bpm) if bpm is not None else stroke_to_bpm(_to_float(stroke))
+        bpf = _to_float(bpf)
+        if forward_fill:
+            bpm = _forward_fill(bpm)
+        n = len(bpf)
+        if len(bpm) != n:
+            raise ValueError("bpm and bpf must have the same length")
+
+        both = np.isfinite(bpm) & np.isfinite(bpf)
+        idx = np.where(both)[0]
+        if idx.size == 0:
+            raise ValueError("no foot has both a blow rate and a blow count")
+        sl = slice(idx[0], idx[-1] + 1)
+        bpm, bpf = bpm[sl], bpf[sl]
+
+        if elevation is not None:
+            elevation = _to_float(elevation)
+            if len(elevation) != n:
+                raise ValueError("elevation must have the same length as bpf")
+            elevation = elevation[sl]
+        else:
+            depth = _to_float(depth)
+            if len(depth) != n:
+                raise ValueError("depth must have the same length as bpf")
+            depth = depth[sl]
+            elevation = float(tip_elevation) + depth[-1] - depth
+
+        return cls(pile_id, pile, hammer, elevation, bpm, bpf)
+
+    @classmethod
+    def from_csv(cls, path, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+                 elevation=None, depth=None, tip_elevation=None, skiprows=0,
+                 delimiter=",", forward_fill=False):
+        """Read a log from a delimited text file.
+
+        Parameters
+        ----------
+        path : str or Path
+            File to read.
+        pile_id : str
+            Identifier of the pile.
+        pile : Pile
+            The pile that was driven.
+        hammer : Hammer
+            The hammer that drove it.
+        bpf, bpm, stroke, elevation, depth : str or int
+            Column holding each quantity, by header name or zero-based index.
+            Exactly one of ``bpm``/``stroke`` and one of
+            ``elevation``/``depth`` must be given.
+        tip_elevation : float, optional
+            Final toe elevation, ft; required with ``depth``.
+        skiprows : int, default 0
+            Lines to skip before the data (or before the header row when
+            columns are named).
+        delimiter : str, default ","
+            Field delimiter.
+        forward_fill : bool, default False
+            See `from_arrays`.
+
+        Returns
+        -------
+        DriveLog
+        """
+        specs = {"bpf": bpf, "bpm": bpm, "stroke": stroke,
+                 "elevation": elevation, "depth": depth}
+        given = {k: v for k, v in specs.items() if v is not None}
+        with open(Path(path), newline="", encoding="utf-8-sig") as fh:
+            rows = [r for r in csv.reader(fh, delimiter=delimiter)]
+        rows = rows[skiprows:]
+        if any(isinstance(v, str) for v in given.values()):
+            header = [h.strip() for h in rows[0]]
+            rows = rows[1:]
+            for k, v in given.items():
+                if isinstance(v, str):
+                    if v not in header:
+                        raise ValueError(f"column {v!r} not found in header {header}")
+                    given[k] = header.index(v)
+        rows = [r for r in rows if any(c.strip() for c in r)]
+
+        def column(j):
+            return [r[j] if j < len(r) else "" for r in rows]
+
+        cols = {k: column(j) for k, j in given.items()}
+        return cls.from_arrays(
+            pile_id, pile, hammer, bpf=cols["bpf"], bpm=cols.get("bpm"),
+            stroke=cols.get("stroke"), elevation=cols.get("elevation"),
+            depth=cols.get("depth"), tip_elevation=tip_elevation,
+            forward_fill=forward_fill,
+        )
 
 
 @dataclass(frozen=True)

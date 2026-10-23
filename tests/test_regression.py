@@ -8,8 +8,8 @@ import driven_pile as dp
 
 
 def test_target_matches_research_within_rounding(fixture):
-    log, pile, hammer, site = paper_inputs(fixture)
-    target = dp.prepare_target(log, pile, hammer, site)
+    log, site = paper_inputs(fixture)
+    target = dp.prepare_target(log, site)
     ref = fixture["target"]
     n_top = target.n_top
     np.testing.assert_allclose(target.elevation[n_top:], ref["elevation"])
@@ -18,12 +18,12 @@ def test_target_matches_research_within_rounding(fixture):
 
 
 def test_march_reproduces_research_on_identical_target(fixture):
-    log, pile, hammer, site = paper_inputs(fixture)
-    target = dp.prepare_target(log, pile, hammer, site)
+    log, site = paper_inputs(fixture)
+    target = dp.prepare_target(log, site)
     research_target = target.with_capacity(
         np.concatenate([np.full(target.n_top, np.nan), fixture["target"]["capacity"]]))
     ref = fixture["reference"]
-    res = dp.run_drive(research_target, pile, site, top_phi=ref["top_phi"])
+    res = dp.run_drive(research_target, site, top_phi=ref["top_phi"])
     np.testing.assert_allclose(res.elevation, ref["elevation"])
     np.testing.assert_allclose(res.phi, ref["phi"], rtol=1e-6, atol=1e-6)
     np.testing.assert_allclose(res.ru, ref["ru"], rtol=1e-6, atol=1e-6)
@@ -37,16 +37,16 @@ def test_march_reproduces_research_on_identical_target(fixture):
 
 
 def test_capacity_from_log_matches_research_within_one_percent(fixture):
-    log, pile, hammer, site = paper_inputs(fixture)
-    target = dp.prepare_target(log, pile, hammer, site)
+    log, site = paper_inputs(fixture)
+    target = dp.prepare_target(log, site)
     ref = fixture["reference"]
-    res = dp.run_drive(target, pile, site, top_phi=ref["top_phi"])
+    res = dp.run_drive(target, site, top_phi=ref["top_phi"])
     assert res.ltc == pytest.approx(ref["ltc"], rel=0.01)
 
 
 @pytest.mark.slow
 def test_top_band_matches_frozen_sweep(fixture):
-    log, pile, hammer, site = paper_inputs(fixture)
-    target = dp.prepare_target(log, pile, hammer, site)
-    band = dp.sweep_top_phi(target, pile, site)
+    log, site = paper_inputs(fixture)
+    target = dp.prepare_target(log, site)
+    band = dp.sweep_top_phi(target, site)
     assert (band.lo, band.hi) == (fixture["band"]["lo"], fixture["band"]["hi"])

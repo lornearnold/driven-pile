@@ -9,7 +9,7 @@ characterization with pore pressure dissipated gives the long-term capacity.
 
 from .analysis import analyze
 from .capacity import long_term_capacity
-from .inputs import DriveLog, FinesProfile, Hammer, Pile, Site, bpm_to_stroke
+from .inputs import DriveLog, FinesProfile, Hammer, Pile, Site, bpm_to_stroke, stroke_to_bpm
 from .march import run_drive
 from .montecarlo import monte_carlo
 from .options import McOptions, ModelOptions
@@ -23,5 +23,5 @@ __all__ = [
     "Analysis", "DriveLog", "DriveResult", "FinesProfile", "Hammer", "McOptions",
     "McResult", "ModelOptions", "Pile", "Site", "Target", "TopPhiBand", "analyze",
     "bpm_to_stroke", "long_term_capacity", "monte_carlo", "prepare_target",
-    "run_drive", "sweep_top_phi",
+    "run_drive", "stroke_to_bpm", "sweep_top_phi",
 ]

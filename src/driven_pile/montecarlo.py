@@ -13,15 +13,13 @@ from .results import McResult
 from .top_segment import sweep_top_phi
 
 
-def monte_carlo(log, pile, hammer, site, options=None, mc_options=None, *,
+def monte_carlo(log, site, options=None, mc_options=None, *,
                 target=None, top_band=None):
     """Realizations of the long-term capacity under the five uncertainty sources.
 
     Parameters
     ----------
     log : DriveLog
-    pile : Pile
-    hammer : Hammer
     site : Site
     options : ModelOptions, optional
     mc_options : McOptions, optional
@@ -48,9 +46,9 @@ def monte_carlo(log, pile, hammer, site, options=None, mc_options=None, *,
     options = options or ModelOptions()
     mc = mc_options or McOptions()
     if target is None:
-        target = prepare_target(log, pile, hammer, site, options)
+        target = prepare_target(log, site, options)
     if top_band is None:
-        top_band = sweep_top_phi(target, pile, site, options)
+        top_band = sweep_top_phi(target, site, options)
     rng = np.random.default_rng(mc.seed)
 
     noise_sd = residual_scale(target) if mc.target_noise else 0.0
@@ -71,7 +69,7 @@ def monte_carlo(log, pile, hammer, site, options=None, mc_options=None, *,
             cap[logged] = np.maximum(
                 bias * (cap[logged] + rng.normal(0.0, noise_sd, int(logged.sum()))), 1.0)
             opts = replace(options, dphi=dphi, crr_multiplier=crr)
-            res = run_drive(target.with_capacity(cap), pile, site, opts, top_phi=top_phi)
+            res = run_drive(target.with_capacity(cap), site, opts, top_phi=top_phi)
             draws["ltc"].append(res.ltc)
             draws["shaft"].append(res.ltc_shaft)
             draws["toe_eod"].append(res.toe_eod)

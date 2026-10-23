@@ -9,6 +9,7 @@ from scipy.signal import savgol_filter
 
 from .constants import GAMMA_WATER
 from .formulas import danish_capacity
+from .inputs import Pile
 from .options import ModelOptions
 
 
@@ -23,6 +24,8 @@ class Target:
     ----------
     pile_id : str
         Identifier of the pile.
+    pile : Pile
+        The pile that was driven.
     elevation : ndarray
         Elevation of each foot, ft, descending.
     capacity : ndarray
@@ -42,6 +45,7 @@ class Target:
     """
 
     pile_id: str
+    pile: Pile
     elevation: np.ndarray
     capacity: np.ndarray
     raw_capacity: np.ndarray
@@ -145,17 +149,13 @@ def extend_to_mudline(elevation, mudline):
     return np.concatenate([top, elev]), len(top)
 
 
-def prepare_target(log, pile, hammer, site, options=None, min_feet=20):
+def prepare_target(log, site, options=None, min_feet=20):
     """Build the capacity target from a driving log.
 
     Parameters
     ----------
     log : DriveLog
-        The driving record.
-    pile : Pile
-        Pile geometry and modulus.
-    hammer : Hammer
-        Driving hammer.
+        The driving record, with its pile and hammer.
     site : Site
         Mudline, water table, unit weight and fines content.
     options : ModelOptions, optional
@@ -180,7 +180,7 @@ def prepare_target(log, pile, hammer, site, options=None, min_feet=20):
     order = np.argsort(-elev)
     elev = elev[order]
     bpf = log.bpf[m][order]
-    raw = danish_capacity(bpf, log.stroke[m][order], hammer.ram_weight, pile,
+    raw = danish_capacity(bpf, log.stroke[m][order], log.hammer.ram_weight, log.pile,
                           options.c1, options.c2)
     cap = smooth_capacity(raw, options.smoothing_window, options.smoothing_order)
     if options.tip_anchor:
@@ -191,6 +191,7 @@ def prepare_target(log, pile, hammer, site, options=None, min_feet=20):
     surface = max(site.mudline, float(grid.max()))
     return Target(
         pile_id=log.pile_id,
+        pile=log.pile,
         elevation=grid,
         capacity=np.concatenate([pad, cap]),
         raw_capacity=np.concatenate([pad, raw]),

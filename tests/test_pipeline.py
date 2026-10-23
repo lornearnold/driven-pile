@@ -13,8 +13,8 @@ def inputs():
 
 
 def test_analyze_uses_lowest_admissible_top_phi(inputs):
-    fx, log, pile, hammer, site = inputs
-    out = dp.analyze(log, pile, hammer, site)
+    fx, log, site = inputs
+    out = dp.analyze(log, site)
     assert out.mc is None
     assert out.top_band.lo == fx["band"]["lo"]
     assert out.drive.top_phi == out.top_band.lo
@@ -25,22 +25,22 @@ def test_analyze_uses_lowest_admissible_top_phi(inputs):
 
 
 def test_long_term_capacity_matches_result_fields(inputs):
-    fx, log, pile, hammer, site = inputs
-    target = dp.prepare_target(log, pile, hammer, site)
-    res = dp.run_drive(target, pile, site, top_phi=fx["band"]["lo"])
+    fx, log, site = inputs
+    target = dp.prepare_target(log, site)
+    res = dp.run_drive(target, site, top_phi=fx["band"]["lo"])
     shaft, toe = dp.long_term_capacity(res)
     assert shaft == pytest.approx(res.ltc_shaft)
     assert toe == pytest.approx(res.toe_eod)
 
 
 def test_monte_carlo_is_seeded_and_shaped(inputs):
-    fx, log, pile, hammer, site = inputs
-    target = dp.prepare_target(log, pile, hammer, site)
+    fx, log, site = inputs
+    target = dp.prepare_target(log, site)
     band = dp.TopPhiBand(phi=np.array([]), rms=np.array([]),
                          lo=fx["band"]["lo"], hi=fx["band"]["hi"])
     opts = dp.McOptions(chunk=5, max_realizations=10, seed=3)
-    a = dp.monte_carlo(log, pile, hammer, site, mc_options=opts, target=target, top_band=band)
-    b = dp.monte_carlo(log, pile, hammer, site, mc_options=opts, target=target, top_band=band)
+    a = dp.monte_carlo(log, site, mc_options=opts, target=target, top_band=band)
+    b = dp.monte_carlo(log, site, mc_options=opts, target=target, top_band=band)
     assert a.n == 10
     np.testing.assert_allclose(a.ltc, b.ltc)
     assert a.phi_quantiles.shape == (len(target.elevation), 5)
