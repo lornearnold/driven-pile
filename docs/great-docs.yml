@@ -405,13 +405,12 @@ reference:
       - Analysis
       - DriveLog  # 3 method(s)
       - DriveResult  # 4 method(s)
-      - FinesProfile  # 3 method(s)
       - Hammer
       - McOptions
       - McResult  # 3 method(s)
       - ModelOptions
       - Pile  # 3 method(s)
-      - Site
+      - SoilProfile  # 1 method(s)
       - Target  # 1 method(s)
       - TopPhiBand
 
