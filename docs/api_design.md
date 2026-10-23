@@ -1,7 +1,8 @@
-# driven-pile: public API design (for review)
+# driven-pile: public API design
 
-Status: proposal, 2026-10-23. Nothing here is implemented yet. Equation
-numbers refer to the ASCE 2027 manuscript Methods section.
+Status: revised 2026-10-23 after review; implemented the same day in
+`src/driven_pile/`.
+Equation numbers refer to the ASCE 2027 manuscript Methods section.
 
 ## 1. Scope and principles
 
@@ -13,8 +14,8 @@ numbers refer to the ASCE 2027 manuscript Methods section.
   five-source Monte Carlo. Retired exploration modes from the research repo
   are not ported.
 - Soil classification is out of scope. Fines content is an input.
-- Dependencies: numpy and scipy only. matplotlib and pandas are optional
-  extras used only by `plot_*` methods and `to_dataframe()`.
+- Dependencies: numpy and scipy only. matplotlib is an optional extra used
+  only by the `plot_*` helpers.
 - Three layers so students can use the one-call version and researchers can
   reach the pieces:
   1. `analyze(...)` does everything.
@@ -27,45 +28,53 @@ numbers refer to the ASCE 2027 manuscript Methods section.
 
 US customary throughout, matching the construction records and the paper:
 feet, kips, kips per square foot (ksf), degrees. The Danish formula inputs
-(ram weight, pile modulus, area) are therefore kips, ksf, and square feet,
-not the pounds, psi, and square inches the research code used. Conversion
-helpers (`si_to_us`, `us_to_si`) are deferred to a later release.
+(ram weight, pile modulus, area) are therefore kips, ksf, and square feet.
+SI conversion helpers are deferred to a later release.
 
 ## 3. Inputs
 
 ### 3.1 `DriveLog`
 
-The driving record, one row per foot. Either depth or elevation may be given.
+The driving record as the inspector wrote it: one row per foot with blows
+per minute (hammer speed, from which stroke is derived) and blows per foot.
+Mirrors the research repo's `PileLog`, less the site-specific fields
+(coordinates, schedule length, precomputed capacity).
 
 ```python
 @dataclass
 class DriveLog:
-    bpf: np.ndarray                 # blows per foot
-    stroke: np.ndarray              # hammer stroke / drop height, ft
-    elevation: np.ndarray           # ft, toe elevation at the end of each foot
-    pile_id: str = ""
+    pile_id: str
+    elevation: np.ndarray      # ft, toe elevation at the end of each logged foot
+    bpm: np.ndarray            # hammer blows per minute
+    bpf: np.ndarray            # blows per foot
+    valid: np.ndarray          # bool, True where elevation, bpm and bpf are all finite
+
+    @property
+    def stroke(self) -> np.ndarray      # ft, from bpm via free-fall timing
+    @property
+    def depth(self) -> np.ndarray       # ft below the first logged foot
 
     @classmethod
-    def from_arrays(cls, bpf, stroke, *, elevation=None, depth=None,
-                    tip_elevation=None, pile_id="") -> "DriveLog"
+    def from_arrays(cls, pile_id, bpm, bpf, *, elevation=None,
+                    depth=None, tip_elevation=None) -> "DriveLog"
     @classmethod
-    def from_csv(cls, path, *, bpf="bpf", stroke="stroke",
+    def from_csv(cls, path, *, pile_id, bpm="bpm", bpf="bpf",
                  elevation=None, depth=None, tip_elevation=None,
-                 pile_id="") -> "DriveLog"
-    @classmethod
-    def from_tacoma_csv(cls, path) -> "DriveLog"   # the Pier 4 digitized-log layout
+                 skiprows=0) -> "DriveLog"
 ```
 
-- `from_arrays` / `from_csv` accept either `elevation` directly or `depth`
-  plus `tip_elevation` (elevation = tip_elevation + (depth.max() - depth)).
-  Exactly one of the two forms is required.
-- Rows with non-numeric or missing bpf or stroke are dropped and the log is
-  trimmed to the first and last valid rows, as the research reader does.
-  Stroke may be given as blows per minute for an open-ended diesel hammer via
-  a `bpm_to_stroke` helper; the log stores stroke.
-- `from_tacoma_csv` reads the `Pile Location, X / Tip elevation (feet), Y /
-  header / Depth, Energy (H), Blows per foot, Notes` format so the paper's
-  piles load with one call. It is the only site-specific reader.
+- Elevation is either given directly or built from `depth` and
+  `tip_elevation` as `tip_elevation + depth[-1] - depth`, the same rule the
+  research reader uses. Exactly one of the two forms is required.
+- `from_csv` takes column names (or zero-based indices) for the bpm, bpf,
+  and depth or elevation columns and a `skiprows` count, so the Pier 4
+  digitized logs load with `from_csv(path, pile_id=..., depth=0, bpm=1,
+  bpf=2, tip_elevation=..., skiprows=4)`. There is no site-specific reader.
+- Non-numeric cells become NaN and the log is trimmed to the first and last
+  rows where bpm and bpf are both numeric. `valid` marks finite rows inside
+  that span.
+- `bpm_to_stroke(bpm)` is a public function (free-fall stroke from the time
+  between blows for an open-ended diesel hammer).
 
 ### 3.2 `Pile`
 
@@ -95,37 +104,42 @@ perimeter 6.627 ft, width 2.0 ft.
 @dataclass(frozen=True)
 class Hammer:
     ram_weight: float          # kips, W in Eq. 1
-    c1: float = 0.45           # regional recalibration coefficient (Reddy & Stuedlein 2013)
-    c2: float = 0.0            # kips, additive term of the recalibration (0 for concrete)
 ```
 
-Stroke comes from the log, not the hammer. Only the Puget Sound recalibrated
-Danish formula (Eq. 1) is implemented; other dynamic formulas are not ported.
+Stroke comes from the log. The regional recalibration coefficients of Eq. 1
+are a property of the capacity formula, not the hammer, and live in
+`ModelOptions`.
 
 ### 3.4 `Site`
 
 ```python
 @dataclass(frozen=True)
 class Site:
-    mudline: float                      # ft, elevation of the soil surface the pile was driven through
-    water_elevation: float = 0.0        # ft; water table for sigma'_v0
-    gamma_total: float = 0.122          # ksf/ft, total unit weight
-    fines: float | FinesProfile = 15.0  # fines content, percent
+    mudline: float                # ft, elevation of the soil surface the pile was driven through
+    fines: FinesProfile           # fines content versus elevation
+    water_elevation: float = 0.0  # ft; water table for sigma'_v0
+    gamma_total: float = 0.122    # ksf/ft, total unit weight
+
+@dataclass(frozen=True)
+class FinesProfile:
+    elevation: np.ndarray         # ft, descending or ascending
+    fines: np.ndarray             # percent passing No. 200
+    def at(self, elevation) -> np.ndarray   # linear interpolation, end values held
 ```
 
-`FinesProfile` is a small table of (elevation, fines percent) interpolated
-onto the analysis grid; a float means constant fines. This replaces the
-classifier's per-foot p_sand. To reproduce the paper's piles, the per-foot FC
-the classifier produced is passed in as a `FinesProfile`.
+A uniform profile is a two-row table. To reproduce the paper's piles, the
+per-foot FC the classifier produced is passed in as a `FinesProfile`.
 
 ### 3.5 `ModelOptions`
 
-Only the knobs the paper defines. Each field's docstring will cite the
-equation and source. Defaults are the paper's values.
+Only the knobs the paper defines. Defaults are the paper's values.
 
 ```python
 @dataclass(frozen=True)
 class ModelOptions:
+    # capacity formula (Eq. 1): Puget Sound recalibrated Danish
+    c1: float = 0.45               # multiplicative recalibration coefficient
+    c2: float = 0.0                # kips, additive recalibration term
     # friction angle bounds (Eq. 4 and the a-priori sweep)
     phi_lo: float = 25.0
     phi_hi: float = 45.0
@@ -147,7 +161,7 @@ class ModelOptions:
     # preprocessing of the log into the capacity target
     smoothing_window: int = 13     # Savitzky-Golay window, feet
     smoothing_order: int = 2
-    tip_anchor: str = "raw"        # keep the unsmoothed capacity at the final foot
+    tip_anchor: bool = True        # keep the unsmoothed capacity at the final foot
     # unlogged top segment sweep
     top_sweep_step: float = 1.0    # deg
     top_sweep_tol_frac: float = 0.05
@@ -157,10 +171,11 @@ class ModelOptions:
     ru_tol: float = 1e-4
 ```
 
-Fixed constants (not options, because the paper fixes them): 1-ft increments,
-linear ru growth (Eq. 8), 15-cycle CRR reference, Vesic bearing factor,
-`max(...)` shaft law (Eq. 10), Randolph-Murphy interface alpha, no toe setup,
-Nq clamp policy and the "below floor" and "above ceiling" reason codes.
+Fixed by the method, not options: 1-ft increments, linear ru growth
+(Eq. 8), 15-cycle CRR reference, Vesic bearing factor, `max(...)` shaft law
+(Eq. 10), Randolph-Murphy interface alpha, no toe setup, the reason codes
+for feet that cannot be reconciled, and the top-segment point estimate at the
+lowest admissible phi.
 
 ### 3.6 `McOptions`
 
@@ -171,25 +186,26 @@ class McOptions:
     crr_sigma_ln: float = 0.20     # lognormal model error on CRR
     dphi_bound: float = 2.5        # uniform +/- deg on the phi(N160) line
     target_noise: bool = True      # per-foot N(0, robust sd of raw - smoothed)
-    top_phi: str = "sweep"         # uniform over the a-priori admissible band
     ci_target: float = 0.02        # stop when 95% CI half-width of mean LTC < this fraction
     chunk: int = 100
     max_realizations: int = 1200
     seed: int | None = None
 ```
 
+The top-segment phi is always drawn uniform over the admissible band.
+
 ## 4. Pipeline functions
 
 ```python
 def prepare_target(log, pile, hammer, site, options) -> Target
-    # Eq. 1 per foot, Savitzky-Golay smoothing, raw tip anchor, extension of the
+    # Eq. 1 per foot, Savitzky-Golay smoothing, tip anchor, extension of the
     # grid up to the mudline (unlogged top segment), sigma'_v0 profile, fines on grid.
 
 def sweep_top_phi(target, pile, site, options) -> TopPhiBand
-    # constant-phi sweep over [phi_lo, phi_hi]; returns (lo, hi, best, rms_curve)
+    # constant-phi sweep over [phi_lo, phi_hi]; returns lo, hi and the RMS curve
 
 def run_drive(target, pile, site, options, top_phi: float) -> DriveResult
-    # the top-down marching solve (Levels 1-6), per-foot characterization
+    # the top-down marching solve, per-foot characterization
 
 def long_term_capacity(result) -> tuple[float, float]
     # (shaft_kips, toe_eod_kips); toe is the end-of-drive value, no toe setup
@@ -197,75 +213,93 @@ def long_term_capacity(result) -> tuple[float, float]
 def monte_carlo(log, pile, hammer, site, options, mc_options) -> McResult
 
 def analyze(log, pile, hammer, site, options=None, mc_options=None,
-            run_mc=True) -> Analysis
+            run_mc=False) -> Analysis
 ```
 
-`Target` is an internal-but-public dataclass (elev, capacity, bpf, fines,
-sigma_v0, n_top) so a user can inspect or replace the capacity target.
+`Target` is a public dataclass (elevation, capacity, bpf, fines, sigma_v0,
+n_top) so a user can inspect or replace the capacity target. The
+deterministic `analyze` uses the lowest admissible top-segment phi.
 
 ## 5. Results
+
+Plain dataclasses holding numpy arrays, one entry per foot of the analysis
+grid (unlogged top segment included). No table wrapper and no pandas.
 
 ```python
 @dataclass
 class DriveResult:
-    profile: FootTable      # one row per foot: elev, z, sigma_v0, fines, phi, N160,
-                            # CSR, CRR15, NL, felt_arrival, felt, ru, ru_toe,
-                            # fs_eod, fs_ltc, reason, liquefied, liq_when
-    target: np.ndarray      # smoothed capacity target per foot
-    predicted: np.ndarray   # modeled at-time-of-driving capacity per foot
+    elevation: np.ndarray
+    depth: np.ndarray
+    sigma_v0: np.ndarray
+    fines: np.ndarray
+    phi: np.ndarray
+    n160: np.ndarray
+    csr: np.ndarray
+    crr15: np.ndarray
+    cycles_to_liq: np.ndarray
+    felt: np.ndarray
+    ru: np.ndarray
+    fs_eod: np.ndarray
+    fs_ltc: np.ndarray
+    reason: np.ndarray          # str codes: ok, above_ceiling, below_floor, nonfinite, top_segment
+    target: np.ndarray          # smoothed capacity target per foot
+    predicted: np.ndarray       # modeled at-time-of-driving capacity per foot
     top_phi: float
     options: ModelOptions
-    # derived
     eod_capacity: float
     ltc: float
     ltc_shaft: float
     toe_eod: float
-    fit: FitSummary         # rms_kips, pct_ok, pct_ceiling, pct_floor, pct_liquefied
-    def to_dataframe(self)           # requires pandas
-    def plot_profile(self, ax=None)  # phi, N160, ru vs elevation (requires matplotlib)
-    def plot_fit(self, ax=None)      # target vs predicted capacity vs elevation
+    rms_kips: float
+    def plot_profile(self, ax=None)   # phi, N160, ru vs elevation (requires matplotlib)
+    def plot_fit(self, ax=None)       # target vs predicted capacity vs elevation
 
 @dataclass
 class McResult:
-    ltc: np.ndarray          # one value per realization
+    ltc: np.ndarray             # one value per realization
     shaft: np.ndarray
     toe_eod: np.ndarray
-    draws: DrawTable         # bias, dphi, crr_multiplier, top_phi per realization
-    phi_quantiles: FootTable # p5/p25/p50/p75/p95 of phi per foot
-    n: int
+    bias: np.ndarray
+    dphi: np.ndarray
+    crr_multiplier: np.ndarray
+    top_phi: np.ndarray
+    phi_quantiles: np.ndarray   # shape (n_feet, 5): p5, p25, p50, p75, p95
+    elevation: np.ndarray
     converged: bool
     def quantiles(self, q) -> np.ndarray
-    def summary(self) -> dict
     def plot_ltc(self, ax=None)
+
+@dataclass
+class TopPhiBand:
+    phi: np.ndarray             # swept values
+    rms: np.ndarray             # log-fit RMS at each value, kips
+    lo: float
+    hi: float
 
 @dataclass
 class Analysis:
     drive: DriveResult
     top_band: TopPhiBand
     mc: McResult | None
-    # convenience pass-throughs: .ltc, .ltc_shaft, .toe_eod, .profile
 ```
-
-`FootTable` is a thin wrapper over a structured numpy array with named columns
-and `to_dataframe()`; it avoids a hard pandas dependency.
 
 ## 6. Module layout and mapping from the research repo
 
 | new module | content | from (TCE_499_pile-driving) |
 |---|---|---|
-| `inputs.py` | DriveLog, Pile, Hammer, Site, FinesProfile | pile_driving.import_log_file (reader only), DriveParams geometry fields |
-| `options.py` | ModelOptions, McOptions | DriveParams (46 fields -> ~22), run_mc_ltc constants |
+| `inputs.py` | DriveLog, Pile, Hammer, Site, FinesProfile, bpm_to_stroke | pile_driving.PileLog, import_log_file (parsing only), bpm_to_stroke; DriveParams geometry fields |
+| `options.py` | ModelOptions, McOptions | DriveParams (46 fields -> 22), run_mc_ltc constants |
 | `formulas.py` | Eq. 1 recalibrated Danish | pile_driving.danish_ps_pile_capacity, s0_pile_capacity |
 | `preprocess.py` | smoothing, tip anchor, mudline extension, sigma'_v0 grid | bayes_classify.capacity_savgol, drive_model.extend_to_mudline, sigma_v0_profile, run_drive_model.load_target |
 | `spt.py` | Eq. 4 and its inverse | liquefaction.wsdot_phi_from_n160, n160_from_phi |
 | `bearing.py` | Eq. 2, 3: Vesic Nq*, stress-dependent rigidity index, phi inversion | soil_capacity._Nq_vesic, qp_cohesionless, DriveParams.irr_of, drive_model._phi_fast |
 | `shaft.py` | Eq. 5, 10: Coyle & Castello K with Nordlund extension, partial-ru law, Randolph-Murphy alpha | drive_model.fs_coyle_castello, nordlund_kdelta, liq_interface_alpha, Sample.fs_* |
-| `liquefaction.py` | Eq. 6-9: CSR, Boulanger & Idriss CRR, NL, linear ru, Kramer & Wang Sr | liquefaction.py (as is, minus retired ru_seed) |
+| `liquefaction.py` | Eq. 6-9: CSR, Boulanger & Idriss CRR, NL, linear ru, Kramer & Wang Sr | liquefaction.py (minus retired ru_seed) |
 | `march.py` | Sample, characterize_foot, run_drive | drive_model.run_drive and helpers |
 | `top_segment.py` | sweep_top_phi | run_drive_model.top_phi_range |
 | `capacity.py` | long_term_capacity | drive_model.ltc_parts (eod toe only) |
 | `montecarlo.py` | monte_carlo | run_mc_ltc.run_realization (no CSV cache, no multiprocessing coupling) |
-| `results.py` | DriveResult, McResult, Analysis, FootTable | DriveResult.report, result CSV writers |
+| `results.py` | DriveResult, McResult, TopPhiBand, Analysis | DriveResult.report, result CSV writers |
 | `plots.py` | optional matplotlib helpers | figures/drive_model_profiles.py, mc_uncertainty.py (simplified) |
 
 Not ported: bayes_classify, soil_inversion (superseded by drive_model),
@@ -276,23 +310,35 @@ alpha, `density` rigidity, `hybrid` and `beta2` shafts, `fs_lim_mode`,
 `ru_model='seed'`, `fp_seed` variants other than `low`, and the unliquefied-toe
 LTC variant.
 
-## 7. Reproducing the paper
+## 7. Code conventions
 
-A test fixture per benchmark pile holds the Tacoma log, mudline, per-foot
-fines, and the frozen outputs (tagged `paper-freeze-2026-10-23` in the research
-repo). The regression test asserts the deterministic LTC, shaft, and toe match
-to 0.1 kip and the Monte Carlo mean matches within its own CI at a fixed seed.
+- Docstrings follow the numpy convention (Parameters, Returns, Notes,
+  References sections). Each equation-level function cites its equation
+  number and source in References.
+- PEP 8 and standard Python practice: type hints on public signatures,
+  dataclasses for records, no module-level state, no bare `except`.
+- Comments describe what the code does. Design rationale, history, and
+  alternatives considered belong in docs/, not in source files.
+- Tests use pytest. Each equation gets a hand-calculated anchor test; each
+  benchmark pile gets a regression test against the frozen outputs.
 
-## 8. Questions for review
+## 8. Reproducing the paper
 
-1. Units: US customary only for v0.1, with SI helpers later. Agree?
-2. Fines input: constant or (elevation, FC) table. Is a third form needed,
-   for example a layer list with USCS group symbols mapped to nominal FC?
-3. `Hammer` carries only ram weight and the recalibration coefficients. Should
-   it also hold a name and rated energy for reporting?
-4. `DriveLog` stores stroke in feet. For diesel hammers the field record is
-   often blows per minute; keep `bpm_to_stroke` as a public helper, or fold a
-   `stroke_from="bpm"` option into the readers?
-5. `analyze` runs the Monte Carlo by default (seconds to a minute per pile).
-   Default on, or off?
-6. Results as structured numpy with optional pandas, versus requiring pandas.
+A test fixture per benchmark pile holds the Pier 4 log, mudline, per-foot
+fines, and the frozen outputs (tagged `paper-freeze-2026-10-23` in the
+research repo). Because the research code's point estimate used an
+ill-defined argmin over a flat RMS band, the regression test compares the
+package's lowest-admissible-phi result against a re-derived reference at that
+same phi, and checks the admissible band itself against the frozen one.
+
+## 9. Decisions recorded (review of 2026-10-23)
+
+1. US customary units only in v0.1.
+2. Fines content is an (elevation, fines) table; no other input form.
+3. `Hammer` carries only ram weight. The Eq. 1 recalibration coefficients
+   are in `ModelOptions`.
+4. `DriveLog` mirrors `PileLog`: elevation, bpm, bpf, with stroke derived.
+   No site-specific reader.
+5. Monte Carlo is off by default in `analyze`.
+6. Results are dataclasses of plain numpy arrays; no table wrapper, no pandas.
+7. The deterministic top-segment phi is the lowest admissible value.

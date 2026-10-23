@@ -7,6 +7,7 @@ license = "MIT"
 authors = [{ name = "Lorne Arnold", email = "arnoldl@uw.edu" }]
 requires-python = ">=3.11"
 dependencies = [
+    "great-docs>=0.17.0",
     "numpy>=1.26",
     "scipy>=1.11",
 ]
@@ -20,7 +21,6 @@ classifiers = [
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.8"]
-pandas = ["pandas>=2.0"]
 
 [project.urls]
 Repository = "https://github.com/lornearnold/driven-pile"
@@ -37,3 +37,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [tool.ruff]
 line-length = 99
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: sweeps every pile's top-segment band (several minutes)"]

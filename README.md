@@ -13,23 +13,34 @@ The package is a plain Python library: build a `DriveLog`, a `Pile`, a
 `Hammer`, and a `Site`, call `analyze`, and read the result. There is no
 command-line interface.
 
-**Status:** pre-alpha. The public API is being designed in
-[docs/api_design.md](docs/api_design.md); nothing is implemented yet.
+**Status:** pre-release. The API in [docs/api_design.md](docs/api_design.md)
+is implemented and reproduces the research code behind the paper on its 15
+benchmark piles (see `tests/test_regression.py`).
 
-## Planned use
+## Use
 
 ```python
 import driven_pile as dp
 
-log = dp.DriveLog.from_csv("pile_B-25.5.csv")
+log = dp.DriveLog.from_csv("pile_B-25.5.csv", pile_id="B-25.5",
+                           depth="depth_ft", bpm="bpm", bpf="bpf",
+                           tip_elevation=-141.0)
 pile = dp.Pile.octagonal(width_in=24, length_ft=150)
-hammer = dp.Hammer(ram_weight=20.0)             # kips
-site = dp.Site(mudline=-30.0, fines=15.0)       # ft, percent
+hammer = dp.Hammer(ram_weight=20.0)                       # kips
+fines = dp.FinesProfile(elevation=[-30, -80, -150], fines=[10, 35, 15])
+site = dp.Site(mudline=-30.0, fines=fines)                # ft, percent
 
 result = dp.analyze(log, pile, hammer, site)
-print(result.ltc, result.ltc_shaft, result.toe_eod)
+print(result.drive.ltc, result.drive.ltc_shaft, result.drive.toe_eod)
+
+result = dp.analyze(log, pile, hammer, site, run_mc=True)
 print(result.mc.quantiles([0.05, 0.5, 0.95]))
 ```
+
+The deterministic result uses the lowest admissible friction angle for the
+unlogged top segment; `result.top_band` holds the whole admissible band.
+Fines content is required as a table of elevation versus percent fines
+because the method does not classify the soil itself.
 
 Units are US customary throughout (feet, kips, kips per square foot), matching
 the construction records the method was developed on.

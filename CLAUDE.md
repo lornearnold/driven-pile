@@ -1,0 +1,49 @@
+# Working agreement for driven-pile
+
+## What this is
+
+A pip-installable Python library implementing the long-term pile capacity
+method of Arnold (2027), "Subsurface characterization through pile-driving
+records" (ASCE Geo-Congress 2027). It was extracted from the research
+repository `TCE_499_pile-driving` (branch clean-rebuild, tag
+`paper-freeze-2026-10-23`), which stays the home of the data, the manuscript,
+and the soil-classification work. Soil classification is out of scope here.
+
+Read docs/api_design.md before changing the public API and docs/status.md for
+where the work stands.
+
+## Rules
+
+- Implement only what the paper describes. A model-form change needs a
+  published precedent, cited in the function's References section.
+- Never use FHWA table setup factors; the method derives everything from the
+  log and the site inputs.
+- Long-term capacity is always shaft plus the end-of-drive toe. Never add a
+  toe-setup variant.
+- The deterministic top-segment friction angle is the lowest admissible value
+  of the sweep.
+- Do not git commit or push unless Lorne asks. Leave changes in the working
+  tree and say what is uncommitted.
+- Keep executing evident next steps; stop only for decisions that are Lorne's
+  (model-form choices, scope, anything irreversible) or when blocked.
+
+## Code conventions
+
+- numpy docstring convention with Parameters, Returns, Notes and References;
+  equation-level functions cite the equation number and the source.
+- PEP 8, type hints on public signatures, dataclasses for records, no
+  module-level state, no file-system conventions inside the library.
+- Comments describe what the code does. Design rationale and history go in
+  docs/, never in source files.
+- Units: feet, kips, ksf, degrees throughout.
+- Results are dataclasses of plain numpy arrays. No pandas dependency.
+  matplotlib is an optional extra used only by the plot helpers.
+- Tests: pytest. `uv run pytest -q -m "not slow"` is the fast suite
+  (about 15 s); `-m slow` sweeps every benchmark pile's top band (about 2 min).
+  `uv run ruff check src tests` must pass.
+
+## Reporting
+
+- Expand every acronym once per summary.
+- Report results that weaken the method as plainly as results that support it.
+- When verifying a change against the research code, show the comparison.
