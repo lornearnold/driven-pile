@@ -15,6 +15,7 @@ ground.
 
 ```{python}
 import numpy as np
+import matplotlib.pyplot as plt
 import driven_pile as dp
 
 bpm = np.array([55, 55, 53, 48, 42, 42, 50, 50, 49, 46])
@@ -31,14 +32,22 @@ log = dp.DriveLog.from_arrays(
     depth=np.arange(1, 11),  # ft below the first logged foot
     tip_elevation=-50.0,     # ft, toe elevation at the end of the drive
 )
-log.elevation
 ```
 
 The stroke, which the capacity formula needs, is derived from the blow rate
-by free-fall timing:
+by free-fall timing.
 
 ```{python}
-log.stroke.round(2)
+#| fig-cap: The driving record. Blows per foot as logged, and the stroke derived from the blow rate.
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 4), sharey=True)
+ax1.plot(log.bpf, log.elevation, "o-")
+ax1.set_xlabel("blows per foot")
+ax1.set_ylabel("elevation (ft)")
+ax2.plot(log.stroke, log.elevation, "o-")
+ax2.set_xlabel("stroke (ft)")
+for a in (ax1, ax2):
+    a.grid(True, alpha=0.3)
+plt.show()
 ```
 
 The soil profile gives the mudline, the water table and the fines content.
@@ -57,12 +66,23 @@ that unlogged top segment separately, as the next steps show.
 
 `prepare_target` turns the log into a capacity target: the recalibrated
 Danish formula applied to each foot, smoothed, and placed on a one-foot
-grid that runs from the mudline to the toe. The default guard refuses logs
-shorter than 20 ft, so this short example lowers it.
+grid that runs from the mudline to the toe.
 
 ```{python}
-target = dp.prepare_target(log, soil, min_feet=10)
-target.n_top, target.capacity.round(0)
+target = dp.prepare_target(log, soil)
+```
+
+```{python}
+#| fig-cap: Formula capacity per foot (points) and the smoothed target (line). The dashed line is the mudline; the grid above the first logged foot has no target.
+fig, ax = plt.subplots(figsize=(4.5, 5))
+ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="formula per foot")
+ax.plot(target.capacity, target.elevation, color="C0", label="smoothed target")
+ax.axhline(target.mudline, color="k", lw=0.8, ls="--")
+ax.set_xlabel("capacity at time of driving (kips)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="lower left")
+ax.grid(True, alpha=0.3)
+plt.show()
 ```
 
 `sweep_top_phi` tries a constant friction angle for the top segment and
@@ -71,8 +91,16 @@ admissible band is the range of top-segment friction angles the log cannot
 distinguish between.
 
 ```{python}
+#| fig-cap: Misfit of the march versus the assumed top-segment friction angle. The shaded range is the admissible band.
 band = dp.sweep_top_phi(target)
-band.lo, band.hi
+
+fig, ax = plt.subplots(figsize=(5, 3.5))
+ax.plot(band.phi, band.rms, "o-")
+ax.axvspan(band.lo, band.hi, color="C0", alpha=0.15)
+ax.set_xlabel("top-segment friction angle (deg)")
+ax.set_ylabel("RMS misfit (kips)")
+ax.grid(True, alpha=0.3)
+plt.show()
 ```
 
 `run_drive` marches down the grid, characterizing each logged foot from the
@@ -86,14 +114,16 @@ result = dp.run_drive(target, top_phi=band.lo)
 
 ## Results
 
-Friction angle and end-of-drive pore-pressure ratio of the logged feet, top
-down:
+```{python}
+#| fig-cap: Capacity target and the modeled capacity at the time of driving.
+result.plot_fit()
+plt.show()
+```
 
 ```{python}
-logged = result.logged
-np.column_stack([result.elevation[logged],
-                 result.phi[logged].round(1),
-                 result.ru[logged].round(2)])
+#| fig-cap: Friction angle, equivalent blow count and end-of-drive pore-pressure ratio. The dashed line is the top of the logged record.
+result.plot_profile()
+plt.show()
 ```
 
 The long-term capacity is the shaft resistance after the pore pressure has
@@ -116,8 +146,8 @@ result.reason_counts()
 
 ## One call
 
-For a log of 20 ft or more, `analyze` runs the same three stages and
-returns them together, with the Monte Carlo simulation available on request.
+`analyze` runs the same three stages and returns them together, with the
+Monte Carlo simulation available on request.
 
 ```python
 out = dp.analyze(log, soil)            # out.drive, out.top_band

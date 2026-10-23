@@ -87,6 +87,11 @@ Tests pass (68 fast), lint clean. Lorne commits.
   the research code and the tests use the nominal 477 in^2 (3.3125 ft^2).
 - `MonteCarloOptions.ci_target` defaults to 0.02 as the paper states; the research
   runs used 0.05.
+- No minimum log length (Lorne, 2026-10-23). The research code skipped logs
+  with fewer than 20 valid feet, a cutoff with no recorded rationale;
+  `prepare_target` now rejects only a log with no valid feet, and the
+  smoothing window shrinks to fit short logs. All 15 benchmark logs exceed
+  20 feet, so the regression results are unchanged.
 - The top-segment point estimate is the lowest admissible friction angle,
   not the noise-broken argmin of a flat RMS curve.
 - Per-pile mudline overrides and the Savitzky-Golay settings are inputs

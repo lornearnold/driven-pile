@@ -74,7 +74,6 @@ equal to the soil friction angle.
 | `SoilProfile.gamma_total` | 0.122 ksf/ft | total unit weight of the soil |
 | `Pile.modulus` | 864,000 ksf | elastic modulus of the pile material (the default is prestressed concrete) |
 | `Hammer.ram_weight` | required | ram weight in kips, $W$ in the Danish formula |
-| `prepare_target(min_feet=...)` | 20 | smallest number of valid logged feet accepted |
 
 Physical constants, in `driven_pile.constants`: unit weight of water
 0.0624 ksf/ft, atmospheric pressure 2.116 ksf, gravitational acceleration

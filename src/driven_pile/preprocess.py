@@ -149,7 +149,7 @@ def extend_to_mudline(elevation, mudline):
     return np.concatenate([top, elev]), len(top)
 
 
-def prepare_target(log, soil, options=None, min_feet=20):
+def prepare_target(log, soil, options=None):
     """Build the capacity target from a driving log.
 
     Parameters
@@ -160,8 +160,6 @@ def prepare_target(log, soil, options=None, min_feet=20):
         Mudline, water table, unit weight and fines content.
     options : ModelOptions, optional
         Formula coefficients and smoothing settings.
-    min_feet : int
-        Smallest number of valid logged feet accepted.
 
     Returns
     -------
@@ -170,13 +168,13 @@ def prepare_target(log, soil, options=None, min_feet=20):
     Raises
     ------
     ValueError
-        If the log has fewer than ``min_feet`` valid feet.
+        If the log has no valid feet.
     """
     options = options or ModelOptions()
     m = log.valid
-    if m.sum() < min_feet:
+    if not m.any():
         who = f"{log.pile_id}: " if log.pile_id else ""
-        raise ValueError(f"{who}only {int(m.sum())} valid feet; need {min_feet}")
+        raise ValueError(f"{who}no valid feet in the log")
     elev = log.elevation[m]
     order = np.argsort(-elev)
     elev = elev[order]
