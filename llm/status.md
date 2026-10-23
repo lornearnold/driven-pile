@@ -10,9 +10,12 @@ Last updated 2026-10-23.
    outputs for the 15 benchmark piles.
 2. **API design.** llm/api_design.md, reviewed by Lorne; decisions in its
    section 9.
-3. **Repository.** github.com/lornearnold/driven-pile, public, MIT, hatchling,
-   numpy and scipy only, Python 3.11+, GitHub Actions CI
-   (.github/workflows/ci.yml: ruff and pytest on 3.11 to 3.13).
+3. **Repository.** github.com/lornearnold/driven-pile, public, GPL-3.0-or-later
+   (changed from MIT on 2026-10-23 to match the research repo), hatchling,
+   numpy and scipy only, Python 3.11+. GitHub Actions
+   (.github/workflows/ci.yml): ruff and the fast pytest suite on 3.11 to
+   3.13 on every push and pull request; the slow suite on 3.13 on pull
+   requests only.
 4. **Port.** All modules in src/driven_pile/ implemented per the design:
    inputs, options, formulas, preprocess, spt, liquefaction, bearing, shaft,
    march, top_segment, capacity, montecarlo, results, plots, analysis.
@@ -32,9 +35,36 @@ Last updated 2026-10-23.
      research 1353, 391.
    - 83 tests pass; lint is clean.
 
+6. **Documentation** (2026-10-23), built with great-docs from the main
+   branch (`uv sync --group docs`; the released 0.17.0 does not yet know the
+   `docs/` layout) and Quarto. docs/great-docs.yml configures the site;
+   docs/user_guide/ holds installation, quickstart (ten hand-typed feet,
+   deterministic, min_feet lowered to 10), method (Eq. 1 to 10 mapped to
+   functions) and parameters (every option with default and source, and
+   the Eq. 5 interface-angle discrepancy noted); docs/examples/walkthrough.qmd
+   steps through the five stages on pile B-20 from CSVs in
+   docs/examples/data/. The equation-level functions are in the API
+   reference by dotted name. The marimo notebook of the original plan is
+   deferred; the example is a Quarto notebook for now (Lorne, 2026-10-23).
+   .github/workflows/docs.yml builds and publishes to GitHub Pages.
+   docs/_freeze/ caches executed cells and is committed per the great-docs
+   layout.
+7. **Release scaffolding** (2026-10-23). Version 0.1.0;
+   .github/workflows/publish.yml builds with `uv build` and uploads to PyPI
+   through trusted publishing when a GitHub release is published. Zenodo
+   DOI and the manuscript's data availability line are skipped for now
+   (Lorne, 2026-10-23).
+
 ## Uncommitted
 
-API revision of 2026-10-23 (design decision 8): `DriveLog` now requires a
+Docs, release scaffolding and license change of 2026-10-23 (items 6 and 7
+above), plus: `McOptions` and `McResult` renamed to `MonteCarloOptions`
+and `MonteCarloResult`; `pile_id` is an optional keyword on `DriveLog`,
+`Target` and `DriveResult`; great-docs moved to a `docs` dependency group
+with a git source. Tests pass (70 fast), lint clean, `great-docs build`
+clean, `uv build` produces the 0.1.0 wheel and sdist. Lorne commits.
+
+Earlier, also uncommitted: the API revision of 2026-10-23 (design decision 8): `DriveLog` now requires a
 `Pile` and `Hammer`; `prepare_target`, `sweep_top_phi`, `run_drive`,
 `monte_carlo` and `analyze` take `(log or target, site, ...)` with no
 separate pile or hammer argument; `Target` carries the pile. `DriveLog`
@@ -68,18 +98,18 @@ Tests pass (68 fast), lint clean. Lorne commits.
 
 ## Next phases
 
-6. **Rewire the research repository** to depend on this package (uv path
+8. **Publish 0.1.0.** On PyPI, add a trusted publisher for
+   lornearnold/driven-pile, workflow publish.yml, environment `pypi`; on
+   GitHub, create the `pypi` environment, enable Pages from GitHub Actions,
+   then tag and publish a v0.1.0 release. The install line in
+   docs/user_guide/installation.qmd assumes the package is on PyPI.
+9. **Rewire the research repository** to depend on this package (uv path
    source first, PyPI later), rerun run_drive_model.py and run_mc_ltc.py,
    confirm the numbers, regenerate the manuscript figures, then archive the
    superseded modules (src/pile/drive_model.py, liquefaction.py,
    soil_capacity.py, soil_inversion.py).
-7. **Documentation.** docs/method.md mapping Eq. 1 through 10 to functions, a
-   parameter table with defaults and sources, and one marimo example
-   notebook (`examples/quickstart_mo.py`, the `_mo.py` suffix is Lorne's
-   convention) that loads a bundled fixture log and runs `analyze`.
-8. **Release.** PyPI trusted publishing from GitHub Actions, version 0.1.0,
-   Zenodo DOI, pip install line in the manuscript's data availability
-   statement. Decide whether MIT stays (the research repo is GPL-3).
+10. **Later.** Zenodo DOI, the manuscript's data availability statement, a
+    marimo version of the walkthrough (`_mo.py` suffix).
 
 ## Regenerating fixtures
 

@@ -1,4 +1,4 @@
-"""Friction angle versus overburden-corrected blow count (Eq. 4)."""
+"""Friction angle versus overburden-corrected blow count."""
 
 from __future__ import annotations
 
@@ -23,8 +23,7 @@ def phi_from_n160(n160, cap=45.0):
 
     References
     ----------
-    WSDOT Geotechnical Design Manual (2022), Table 5-1 band midpoints;
-    Eq. 4 of Arnold (2027).
+    WSDOT Geotechnical Design Manual (2022), Table 5-1 band midpoints.
     """
     n160 = np.asarray(n160, dtype=float)
     return np.minimum(26.0 + 5.5 * np.log10(n160 + 0.01) + 0.11 * n160, cap)

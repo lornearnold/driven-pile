@@ -1,0 +1,125 @@
+---
+title: Quick start
+---
+
+This page runs a deterministic analysis on ten feet of a driving record
+typed in by hand. The [walkthrough](../examples/walkthrough.qmd) does the same
+on a full benchmark log and explains each stage.
+
+## Inputs
+
+A driving record is the inspector's log: for each foot the pile advanced,
+the hammer speed in blows per minute and the number of blows it took.
+The package also needs the pile, the hammer and a description of the
+ground.
+
+```{python}
+import numpy as np
+import driven_pile as dp
+
+bpm = np.array([55, 55, 53, 48, 42, 42, 50, 50, 49, 46])
+bpf = np.array([3, 5, 5, 7, 4, 9, 13, 20, 22, 20])
+
+pile = dp.Pile.octagonal(width_in=24, length_ft=60)
+hammer = dp.Hammer(ram_weight=20.0)  # kips
+
+log = dp.DriveLog.from_arrays(
+    pile,
+    hammer,
+    bpm=bpm,
+    bpf=bpf,
+    depth=np.arange(1, 11),  # ft below the first logged foot
+    tip_elevation=-50.0,     # ft, toe elevation at the end of the drive
+)
+log.elevation
+```
+
+The stroke, which the capacity formula needs, is derived from the blow rate
+by free-fall timing:
+
+```{python}
+log.stroke.round(2)
+```
+
+The soil profile gives the mudline, the water table and the fines content.
+A single fines value makes a uniform profile; a table of elevation versus
+percent fines is interpolated.
+
+```{python}
+soil = dp.SoilProfile(mudline=-10.0, water_elevation=-10.0, fines=15.0)
+```
+
+Here the first logged foot is 31 ft below the mudline, so the pile passed
+through 30 ft of soil that the log says nothing about. The method treats
+that unlogged top segment separately, as the next steps show.
+
+## The three stages
+
+`prepare_target` turns the log into a capacity target: the recalibrated
+Danish formula applied to each foot, smoothed, and placed on a one-foot
+grid that runs from the mudline to the toe. The default guard refuses logs
+shorter than 20 ft, so this short example lowers it.
+
+```{python}
+target = dp.prepare_target(log, soil, min_feet=10)
+target.n_top, target.capacity.round(0)
+```
+
+`sweep_top_phi` tries a constant friction angle for the top segment and
+keeps the values whose fit to the log is as good as the best one. The
+admissible band is the range of top-segment friction angles the log cannot
+distinguish between.
+
+```{python}
+band = dp.sweep_top_phi(target)
+band.lo, band.hi
+```
+
+`run_drive` marches down the grid, characterizing each logged foot from the
+toe resistance the target demands and tracking the pore pressure that
+later blows generate. The deterministic analysis uses the lowest admissible
+top-segment friction angle.
+
+```{python}
+result = dp.run_drive(target, top_phi=band.lo)
+```
+
+## Results
+
+Friction angle and end-of-drive pore-pressure ratio of the logged feet, top
+down:
+
+```{python}
+logged = result.logged
+np.column_stack([result.elevation[logged],
+                 result.phi[logged].round(1),
+                 result.ru[logged].round(2)])
+```
+
+The long-term capacity is the shaft resistance after the pore pressure has
+dissipated plus the toe resistance at the end of the drive. No toe setup is
+modeled.
+
+```{python}
+print(f"end of drive {result.eod_capacity:.0f} kips")
+print(f"long term    {result.ltc:.0f} kips "
+      f"= shaft {result.ltc_shaft:.0f} + toe {result.toe_eod:.0f}")
+```
+
+Every foot carries an outcome code. `ok` means the toe resistance was
+reconciled with a friction angle inside the bounds; `above_ceiling` and
+`below_floor` mean it was pinned at a bound.
+
+```{python}
+result.reason_counts()
+```
+
+## One call
+
+For a log of 20 ft or more, `analyze` runs the same three stages and
+returns them together, with the Monte Carlo simulation available on request.
+
+```python
+out = dp.analyze(log, soil)            # out.drive, out.top_band
+out = dp.analyze(log, soil, run_mc=True)  # adds out.mc
+```

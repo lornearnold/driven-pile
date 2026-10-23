@@ -1,0 +1,209 @@
+---
+title: Walkthrough on a benchmark log
+description: Load a Pier 4 driving record, build the capacity target, sweep the unlogged top segment, run the march, and propagate the uncertainty.
+---
+
+This example steps through the method on one of the benchmark piles,
+pile B-20 of the Pier 4 data set. Each stage of `analyze`
+is run by hand so that its inputs and outputs can be inspected. The
+[method page](../user-guide/method.qmd) explains the equations behind
+each stage.
+
+## Load the record
+
+The log is a CSV with one row per foot: toe elevation, hammer stroke and
+blows per foot. This inspector recorded the stroke in feet instead of the
+blow rate, so the `stroke` column is named; the package converts it to
+blows per minute on input.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import driven_pile as dp
+
+pile = dp.Pile.octagonal(width_in=24, length_ft=170.5)
+hammer = dp.Hammer(ram_weight=20.0)  # kips
+
+log = dp.DriveLog.from_csv(
+    "data/B-20_log.csv",
+    pile,
+    hammer,
+    elevation="elevation_ft",
+    stroke="stroke_ft",
+    bpf="bpf",
+    pile_id="B-20",
+)
+print(f"{len(log.elevation)} logged feet, "
+      f"from {log.elevation.max():.1f} to {log.elevation.min():.1f} ft")
+```
+
+The fines content comes from a second table of elevation versus percent
+passing the No. 200 sieve. The mudline at this pile is 50 ft below datum,
+32 ft above the first logged foot.
+
+```{python}
+fines = np.loadtxt("data/B-20_fines.csv", delimiter=",", skiprows=1)
+soil = dp.SoilProfile(mudline=-50.0, elevation=fines[:, 0], fines=fines[:, 1])
+```
+
+## Stage 1: the capacity target
+
+`prepare_target` applies the recalibrated Danish formula to each
+foot, smooths the result with a Savitzky-Golay filter, anchors the final
+foot to its unsmoothed value, and extends the grid up to the mudline.
+
+```{python}
+target = dp.prepare_target(log, soil)
+print(f"grid of {len(target.elevation)} feet, {target.n_top} of them unlogged")
+```
+
+```{python}
+#| fig-cap: Formula capacity per foot (points) and the smoothed target (line).
+fig, ax = plt.subplots(figsize=(4.5, 6))
+ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="formula per foot")
+ax.plot(target.capacity, target.elevation, color="C0", label="smoothed target")
+ax.axhline(target.mudline, color="k", lw=0.8, ls="--")
+ax.set_xlabel("capacity at time of driving (kips)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="lower left")
+ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+## Stage 2: the unlogged top segment
+
+The pile passed through 32 ft of soil before the inspector started
+logging. `sweep_top_phi` assigns a constant friction angle to that segment,
+runs the march for each value from 25 to 45 degrees, and records the
+root-mean-square misfit between the modeled and target capacities over the
+logged feet.
+
+```{python}
+band = dp.sweep_top_phi(target)
+print(f"admissible top-segment friction angle: {band.lo:.0f} to {band.hi:.0f} deg")
+```
+
+```{python}
+#| fig-cap: Misfit of the march versus the assumed top-segment friction angle. The shaded range is the admissible band.
+fig, ax = plt.subplots(figsize=(5, 3.5))
+ax.plot(band.phi, band.rms, "o-")
+ax.axvspan(band.lo, band.hi, color="C0", alpha=0.15)
+ax.set_xlabel("top-segment friction angle (deg)")
+ax.set_ylabel("RMS misfit (kips)")
+ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+The log cannot distinguish between angles inside the band. The
+deterministic analysis uses the lowest one; the Monte Carlo draws from the
+whole band.
+
+## Stage 3: the march
+
+`run_drive` characterizes each logged foot from the toe resistance the
+target demands after subtracting the shaft resistance of the feet above,
+and tracks the pore pressure that later blows generate in every foot.
+
+```{python}
+result = dp.run_drive(target, top_phi=band.lo)
+print(f"RMS misfit {result.rms_kips:.1f} kips")
+print("outcome codes:", result.reason_counts())
+print(f"{100 * result.fraction_liquefied():.0f}% of the logged feet liquefied during the drive")
+```
+
+```{python}
+#| fig-cap: Capacity target and the modeled capacity at the time of driving.
+result.plot_fit()
+plt.show()
+```
+
+```{python}
+#| fig-cap: Friction angle, equivalent blow count and end-of-drive pore-pressure ratio. The dashed line is the top of the logged record.
+result.plot_profile()
+plt.show()
+```
+
+The per-foot arrays are plain NumPy arrays on the result:
+
+```{python}
+logged = result.logged
+np.column_stack([
+    result.elevation[logged][:8],
+    result.phi[logged][:8].round(1),
+    result.n160[logged][:8].round(0),
+    result.felt[logged][:8].round(0),
+    result.cycles_to_liq[logged][:8].round(0),
+    result.ru[logged][:8].round(2),
+])
+```
+
+## Stage 4: long-term capacity
+
+The long-term capacity is the shaft resistance of every foot after its
+pore pressure has dissipated plus the toe resistance at the end of the
+drive. `long_term_capacity` returns the two parts; `run_drive` has already
+stored them on the result.
+
+```{python}
+shaft, toe = dp.long_term_capacity(result)
+print(f"end of drive  {result.eod_capacity:6.0f} kips")
+print(f"long term     {result.ltc:6.0f} kips = shaft {shaft:.0f} + toe {toe:.0f}")
+```
+
+```{python}
+#| fig-cap: Unit shaft resistance at the end of the drive and after pore-pressure dissipation.
+fig, ax = plt.subplots(figsize=(4.5, 6))
+ax.plot(result.fs_eod, result.elevation, label="end of drive")
+ax.plot(result.fs_ltc, result.elevation, label="long term")
+ax.set_xlabel("unit shaft resistance (ksf)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="lower right")
+ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+## Stage 5: Monte Carlo
+
+`monte_carlo` repeats the march with the five uncertainty sources drawn
+per realization. The target and the band computed above are passed in so
+they are not recomputed. A seed makes the run reproducible; the
+realization limit is lowered here to keep the page quick to build.
+
+```{python}
+mc_opts = dp.MonteCarloOptions(seed=1, chunk=50, max_realizations=200)
+mc = dp.monte_carlo(log, soil, mc_options=mc_opts, target=target, top_band=band)
+mean, half = mc.mean_ci()
+q05, q50, q95 = mc.quantiles([0.05, 0.5, 0.95])
+print(f"{mc.n} realizations, converged: {mc.converged}")
+print(f"mean {mean:.0f} +/- {half:.0f} kips, median {q50:.0f}, 5th to 95th {q05:.0f} to {q95:.0f}")
+```
+
+```{python}
+#| fig-cap: Long-term capacity over the realizations, with the 5th, 50th and 95th percentiles.
+mc.plot_ltc()
+plt.show()
+```
+
+```{python}
+#| fig-cap: Friction angle percentiles per foot over the realizations.
+fig, ax = plt.subplots(figsize=(4.5, 6))
+p = mc.phi_quantiles
+ax.fill_betweenx(mc.elevation, p[:, 0], p[:, 4], color="C0", alpha=0.2, label="5th to 95th")
+ax.fill_betweenx(mc.elevation, p[:, 1], p[:, 3], color="C0", alpha=0.4, label="25th to 75th")
+ax.plot(p[:, 2], mc.elevation, color="C0", label="median")
+ax.set_xlabel("friction angle (deg)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="lower left")
+ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+## The same in one call
+
+`analyze` runs stages 1 to 4, and stage 5 when asked, and returns them
+together.
+
+```{python}
+out = dp.analyze(log, soil)
+print(out.drive.ltc == result.ltc, out.top_band.lo == band.lo)
+```

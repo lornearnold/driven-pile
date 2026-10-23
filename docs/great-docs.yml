@@ -22,7 +22,7 @@
 # marketing/presentation name (e.g. 'My Package').
 # : null - (default) the actual package name (e.g. 'my_package' or 'my-package')
 # : type(str) - the name to display
-# display_name: null
+display_name: driven-pile
 
 # Project Type
 # ------------
@@ -129,7 +129,7 @@ dynamic: true
 # Canonical address of the deployed docs site. Used for skills-page install
 # commands, .well-known/ discovery, sitemaps, and subdirectory deployments;
 # also sets website.site-url in _quarto.yml.
-# site_url: null
+site_url: https://lornearnold.github.io/driven-pile/
 
 # Source Link Configuration
 # -------------------------
@@ -314,7 +314,10 @@ authors:
 #   - title: Blog                # Blog section using Quarto's listing directive
 #     dir: blog
 #     type: blog                 # "blog" for Quarto listing, omit for card grid
-# sections: []
+sections:
+  - title: Examples
+    dir: examples
+    index: true
 
 # Custom Static Pages
 # -------------------
@@ -358,7 +361,15 @@ authors:
 #
 # File paths are relative to the user guide directory (no user_guide/ prefix).
 # When using explicit ordering, numeric filename prefixes are preserved as-is.
-# user_guide: null
+user_guide:
+  - section: "Get started"
+    contents:
+      - installation.qmd
+      - quickstart.qmd
+  - section: "Reference"
+    contents:
+      - method.qmd
+      - parameters.qmd
 
 # Bibliography & Citations
 # ------------------------
@@ -399,32 +410,72 @@ authors:
 #       - helper_func
 #       - another_func
 reference:
-  - title: Dataclasses
-    desc: Dataclass definitions
+  - title: Inputs
+    desc: The driving record, the pile and hammer that produced it, and the ground it was driven through.
     contents:
-      - Analysis
-      - DriveLog  # 3 method(s)
-      - DriveResult  # 4 method(s)
+      - name: DriveLog
+        exclude: [__post_init__]
+      - Pile
       - Hammer
-      - McOptions
-      - McResult  # 3 method(s)
+      - SoilProfile
+      - bpm_to_stroke
+      - stroke_to_bpm
+  - title: Options
+    desc: Model parameters and Monte Carlo settings, with the published values as defaults.
+    contents:
       - ModelOptions
-      - Pile  # 3 method(s)
-      - SoilProfile  # 1 method(s)
-      - Target  # 1 method(s)
-      - TopPhiBand
-
-  - title: Functions
-    desc: Utility functions
+      - MonteCarloOptions
+  - title: Pipeline
+    desc: One function per stage of the method, and one call that runs them all.
     contents:
       - analyze
-      - bpm_to_stroke
+      - prepare_target
+      - sweep_top_phi
+      - run_drive
       - long_term_capacity
       - monte_carlo
-      - prepare_target
-      - run_drive
-      - stroke_to_bpm
-      - sweep_top_phi
+  - title: Results
+    desc: Dataclasses of plain NumPy arrays.
+    contents:
+      - Analysis
+      - Target
+      - TopPhiBand
+      - DriveResult
+      - MonteCarloResult
+  - title: "Equation-level functions"
+    desc: The equations of the method, importable from the submodules for teaching and testing.
+    contents:
+      - formulas.elastic_set
+      - formulas.danish_capacity
+      - preprocess.smooth_capacity
+      - preprocess.sigma_v0_profile
+      - preprocess.extend_to_mudline
+      - preprocess.residual_scale
+      - bearing.nq_vesic
+      - bearing.rigidity_index
+      - bearing.toe_bearing
+      - bearing.phi_from_toe_bearing
+      - bearing.phi_from_toe_bearing_grid
+      - spt.phi_from_n160
+      - spt.n160_from_phi
+      - shaft.coyle_castello_k
+      - shaft.nordlund_k_delta
+      - shaft.fs_coyle_castello
+      - shaft.interface_alpha
+      - shaft.fs_partially_liquefied
+      - liquefaction.delta_n_fines
+      - liquefaction.n160_clean_sand
+      - liquefaction.crr_m75
+      - liquefaction.k_sigma
+      - liquefaction.crr_15
+      - liquefaction.csr_driving
+      - liquefaction.cycles_to_liquefaction
+      - liquefaction.ru_linear
+      - liquefaction.residual_strength
+      - capacity.shaft_long_term
+      - capacity.toe_end_of_drive
+      - march.triggering_state
+      - march.characterize_foot
 
 # Inline Methods
 # --------------

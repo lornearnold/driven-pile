@@ -1,6 +1,6 @@
 """Liquefaction triggering under hammer blows and post-liquefaction strength.
 
-Equations 6 through 9 of Arnold (2027). Stresses in ksf.
+Stresses in ksf.
 """
 
 from __future__ import annotations
@@ -124,10 +124,6 @@ def csr_driving(phi):
     -------
     ndarray
         ``tau_max / sigma'v0 = (1 - sin phi) tan phi``.
-
-    References
-    ----------
-    Eq. 6 of Arnold (2027).
     """
     p = np.radians(np.asarray(phi, dtype=float))
     return (1.0 - np.sin(p)) * np.tan(p)
@@ -157,7 +153,7 @@ def cycles_to_liquefaction(csr, crr15, b=0.34, n_ref=N_REF_CYCLES, nl_max=1e9):
 
     References
     ----------
-    Idriss and Boulanger (2008); Eq. 7 of Arnold (2027).
+    Idriss and Boulanger (2008).
     """
     csr = np.asarray(csr, dtype=float)
     crr15 = np.asarray(crr15, dtype=float)
@@ -181,10 +177,6 @@ def ru_linear(n_felt, nl):
     -------
     ndarray
         ``min(n_felt / nl, 1)``.
-
-    References
-    ----------
-    Eq. 8 of Arnold (2027).
     """
     nl = np.maximum(np.asarray(nl, dtype=float), 1e-12)
     return np.minimum(np.asarray(n_felt, dtype=float) / nl, 1.0)
@@ -207,7 +199,7 @@ def residual_strength(n160, sigma_v0):
 
     References
     ----------
-    Kramer and Wang (2015); Eq. 9 of Arnold (2027).
+    Kramer and Wang (2015).
     """
     sig_psf = np.asarray(sigma_v0, dtype=float) * 1000.0
     sr_psf = 2116.0 * np.exp(

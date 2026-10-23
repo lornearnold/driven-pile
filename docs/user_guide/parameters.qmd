@@ -1,0 +1,81 @@
+---
+title: Parameters
+---
+
+Every parameter of the method is a field of `ModelOptions` or
+`MonteCarloOptions`. Pass a
+modified copy to any pipeline function:
+
+```python
+from dataclasses import replace
+opts = replace(dp.ModelOptions(), smoothing_window=9)
+out = dp.analyze(log, soil, options=opts)
+```
+
+Both option classes are frozen dataclasses, so a modified copy is the only
+way to change a value.
+
+## `ModelOptions`
+
+| Field | Default | Role | Source |
+|---|---|---|---|
+| `c1` | 0.45 | multiplicative recalibration coefficient of the Danish formula | Reddy and Stuedlein (2013), Puget Sound |
+| `c2` | 0.0 kips | additive recalibration term | Reddy and Stuedlein (2013) |
+| `phi_lo` | 25 deg | lower bound on the friction angle; floor of the inversion and start of the top-segment sweep | range of the WSDOT (2022) correlation |
+| `phi_hi` | 45 deg | upper bound; ceiling of the inversion, cap of the friction angle correlation and end of the sweep | WSDOT (2022) |
+| `g_ratio` | 0.05 | operative over small-strain shear modulus in the rigidity index | method default |
+| `k2_lo`, `k2_hi` | 30, 75 | modulus coefficient $K_{2,max}$ at `phi_lo` and `phi_hi`, interpolated linearly | Seed and Idriss (1970) |
+| `irr_bounds` | (10, 500) | clamp on the rigidity index | method default |
+| `cc_delta_ratio` | 0.8 | interface friction angle over soil friction angle in the shaft resistance | Coyle and Castello (1981); see note below |
+| `sr_psi_nc` | 0.22 | normally consolidated undrained strength ratio in the interface factor on the residual strength | Randolph and Murphy (1985) |
+| `zone_factor` | 1.5 | a foot feels blows once the toe is within `zone_factor` times the pile width above it | method default |
+| `b_exponent` | 0.34 | exponent of the cyclic strength curve | Idriss and Boulanger (2008) |
+| `ru_cap_toe` | 0.9 | largest pore-pressure ratio applied to the stress the toe bears on | method default |
+| `dphi` | 0 deg | shift of the friction angle line; the Monte Carlo draws it | perturbation hook |
+| `crr_multiplier` | 1.0 | multiplier on the cyclic resistance ratio; the Monte Carlo draws it | perturbation hook |
+| `smoothing_window` | 13 ft | Savitzky-Golay window on the per-foot capacity | method default |
+| `smoothing_order` | 2 | Savitzky-Golay polynomial order | method default |
+| `tip_anchor` | True | keep the unsmoothed capacity at the final foot so the end-of-drive total matches the log | method default |
+| `top_sweep_step` | 1 deg | step of the top-segment sweep | method default |
+| `top_sweep_tol_frac` | 0.05 | a swept angle is admissible when its misfit is within this fraction of the minimum ... | method default |
+| `top_sweep_tol_kips` | 1 kip | ... or within this many kips of it, whichever is larger | method default |
+| `max_iter` | 60 | iteration limit of the per-foot solves | numerics |
+| `ru_tol` | 1e-4 | tolerance of the toe pore-pressure fixed point | numerics |
+
+::: {.callout-note}
+## Interface friction angle
+
+The default interface friction angle is 0.8 times the soil friction angle,
+the ratio Coyle and Castello (1981) used with their earth pressure
+coefficients. Set `cc_delta_ratio=1.0` to take the interface friction angle
+equal to the soil friction angle.
+:::
+
+## `MonteCarloOptions`
+
+| Field | Default | Role | Source |
+|---|---|---|---|
+| `bias_cov` | 0.35 | coefficient of variation of the lognormal bias on the formula capacity, mean 1 | Reddy and Stuedlein (2013) |
+| `crr_sigma_ln` | 0.20 | log standard deviation of the lognormal multiplier on the cyclic resistance ratio, median 1 | method default |
+| `dphi_bound` | 2.5 deg | half-width of the uniform shift of the friction angle line | method default |
+| `target_noise` | True | add normal noise to each foot's target with the robust standard deviation of the raw-minus-smoothed residuals | method default |
+| `ci_target` | 0.02 | stop when the 95 percent confidence half-width of the mean capacity is below this fraction of the mean | method default |
+| `chunk` | 100 | realizations between convergence checks | numerics |
+| `max_realizations` | 1200 | upper limit on realizations | numerics |
+| `seed` | None | seed of the random number generator; set it for a reproducible run | numerics |
+
+## Site and pile inputs
+
+| Input | Default | Role |
+|---|---|---|
+| `SoilProfile.mudline` | required | elevation of the soil surface, ft; sets the unlogged top segment |
+| `SoilProfile.fines` | required | percent passing the No. 200 sieve, one value or a table against `elevation` |
+| `SoilProfile.water_elevation` | 0 ft | water table for the effective stress profile |
+| `SoilProfile.gamma_total` | 0.122 ksf/ft | total unit weight of the soil |
+| `Pile.modulus` | 864,000 ksf | elastic modulus of the pile material (the default is prestressed concrete) |
+| `Hammer.ram_weight` | required | ram weight in kips, $W$ in the Danish formula |
+| `prepare_target(min_feet=...)` | 20 | smallest number of valid logged feet accepted |
+
+Physical constants, in `driven_pile.constants`: unit weight of water
+0.0624 ksf/ft, atmospheric pressure 2.116 ksf, gravitational acceleration
+32.2 ft/s², and the one-foot analysis increment.

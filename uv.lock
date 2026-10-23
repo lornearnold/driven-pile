@@ -526,7 +526,7 @@ wheels = [
 
 [[package]]
 name = "driven-pile"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -547,6 +547,8 @@ dev = [
 ]
 docs = [
     { name = "great-docs" },
+    { name = "ipykernel" },
+    { name = "matplotlib" },
 ]
 
 [package.metadata]
@@ -562,7 +564,11 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
 ]
-docs = [{ name = "great-docs", git = "https://github.com/posit-dev/great-docs.git" }]
+docs = [
+    { name = "great-docs", git = "https://github.com/posit-dev/great-docs.git" },
+    { name = "ipykernel" },
+    { name = "matplotlib", specifier = ">=3.8" },
+]
 
 [[package]]
 name = "executing"

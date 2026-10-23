@@ -1,5 +1,5 @@
-"""Shaft resistance: Coyle and Castello earth pressure (Eq. 5) and the
-partially liquefied law (Eq. 10)."""
+"""Shaft resistance: Coyle and Castello earth pressure and the
+partially liquefied law."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ def fs_coyle_castello(sigma_v0, phi, z, width, delta_ratio=0.8):
 
     References
     ----------
-    Coyle and Castello (1981); Eq. 5 of Arnold (2027).
+    Coyle and Castello (1981).
     """
     phi = np.asarray(phi, dtype=float)
     delta = np.radians(delta_ratio * phi)
@@ -161,6 +161,6 @@ def fs_partially_liquefied(fs_unliq, ru, sr, alpha):
 
     References
     ----------
-    Boulanger and Brandenberg (2004); Eq. 10 of Arnold (2027).
+    Boulanger and Brandenberg (2004).
     """
     return float(max((1.0 - ru) * fs_unliq, ru * alpha * sr))

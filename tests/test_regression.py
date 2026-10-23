@@ -1,4 +1,4 @@
-"""Reproduce the research code's results on the ASCE 2027 benchmark piles."""
+"""Reproduce the research code's results on the benchmark piles."""
 
 import numpy as np
 import pytest

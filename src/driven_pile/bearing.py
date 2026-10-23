@@ -1,5 +1,5 @@
 """Toe bearing in sand: Vesic cavity expansion with a stress-dependent rigidity
-index (Eqs. 2 and 3), and its inversion for the friction angle."""
+index, and its inversion for the friction angle."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def nq_vesic(phi, irr, k0=None):
 
     References
     ----------
-    Vesic (1977); Eq. 2 of Arnold (2027).
+    Vesic (1977).
     """
     p = np.radians(np.asarray(phi, dtype=float))
     sin_p = np.sin(p)
@@ -69,7 +69,7 @@ def rigidity_index(phi, sigma_v, options):
 
     References
     ----------
-    Seed and Idriss (1970); Eq. 3 of Arnold (2027).
+    Seed and Idriss (1970).
     """
     phi = np.asarray(phi, dtype=float)
     p = np.radians(phi)

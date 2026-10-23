@@ -1,9 +1,9 @@
 [project]
 name = "driven-pile"
-version = "0.0.1"
-description = "Long-term capacity of driven piles from the pile-driving log: a pore-pressure-tracking inversion of blow counts (Arnold, ASCE 2027)."
+version = "0.1.0"
+description = "Long-term capacity of driven piles from the pile-driving log: a pore-pressure-tracking inversion of blow counts."
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-or-later"
 authors = [{ name = "Lorne Arnold"}]
 requires-python = ">=3.11"
 dependencies = [
@@ -11,7 +11,8 @@ dependencies = [
     "scipy>=1.11",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Education",
     "Programming Language :: Python :: 3",
@@ -23,6 +24,7 @@ plot = ["matplotlib>=3.8"]
 
 [project.urls]
 Repository = "https://github.com/lornearnold/driven-pile"
+Documentation = "https://lornearnold.github.io/driven-pile/"
 
 [build-system]
 requires = ["hatchling"]
@@ -33,7 +35,7 @@ packages = ["src/driven_pile"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
-docs = ["great-docs"]
+docs = ["great-docs", "ipykernel", "matplotlib>=3.8"]
 
 [tool.uv.sources]
 great-docs = { git = "https://github.com/posit-dev/great-docs.git" }

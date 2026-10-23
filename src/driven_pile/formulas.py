@@ -1,4 +1,4 @@
-"""Dynamic capacity formula applied to the driving log (Eq. 1)."""
+"""Dynamic capacity formula applied to the driving log."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def danish_capacity(bpf, stroke, ram_weight, pile, c1=0.45, c2=0.0):
     References
     ----------
     Sorensen and Hansen (1957); Reddy and Stuedlein (2013), Puget Sound
-    recalibration with unadjusted hammer energy, Eq. 1 of Arnold (2027).
+    recalibration with unadjusted hammer energy.
     """
     bpf = np.asarray(bpf, dtype=float)
     stroke = np.asarray(stroke, dtype=float)

@@ -7,18 +7,18 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ModelOptions:
-    """Parameters of the drive model. Defaults are the values of Arnold (2027).
+    """Parameters of the drive model.
 
     Attributes
     ----------
     c1, c2 : float
         Multiplicative and additive (kips) recalibration coefficients of the
-        Danish formula, Eq. 1 (Reddy and Stuedlein, 2013).
+        Danish formula (Reddy and Stuedlein, 2013).
     phi_lo, phi_hi : float
         Bounds on the friction angle, deg (WSDOT GDM correlation range).
     g_ratio : float
         Ratio of the operative shear modulus to the small-strain modulus in
-        the rigidity index, Eq. 3.
+        the rigidity index.
     k2_lo, k2_hi : float
         Seed and Idriss (1970) modulus coefficient K2,max at ``phi_lo`` and
         ``phi_hi``; interpolated linearly in friction angle.
@@ -26,19 +26,19 @@ class ModelOptions:
         Clamp on the rigidity index.
     cc_delta_ratio : float
         Interface friction angle divided by the soil friction angle in the
-        Coyle and Castello (1981) shaft resistance, Eq. 5.
+        Coyle and Castello (1981) shaft resistance.
     sr_psi_nc : float
         Normally consolidated strength ratio in the Randolph and Murphy (1985)
-        interface factor applied to the residual strength, Eq. 10.
+        interface factor applied to the residual strength.
     zone_factor : float
         A foot starts accumulating blows when the toe is within
         ``zone_factor * width`` above it.
     b_exponent : float
-        Exponent of the cyclic strength curve, Eq. 7.
+        Exponent of the cyclic strength curve.
     ru_cap_toe : float
         Largest pore-pressure ratio applied to the toe stress.
     dphi : float
-        Shift of the friction angle correlation line, deg, Eq. 4.
+        Shift of the friction angle correlation line, deg.
     crr_multiplier : float
         Multiplier on the cyclic resistance ratio.
     smoothing_window, smoothing_order : int

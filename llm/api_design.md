@@ -4,14 +4,14 @@ Status: revised 2026-10-23 after review; implemented the same day in
 `src/driven_pile/`. Revised again 2026-10-23: `DriveLog` carries its `Pile`
 and `Hammer` (decision 8); `SoilProfile` replaces `Site` and `FinesProfile`
 (decision 9).
-Equation numbers refer to the ASCE 2027 manuscript Methods section.
 
 ## 1. Scope and principles
 
 - A plain Python library. No command-line interface, no file-system
   conventions, no module-level data loading. Everything the model needs is
   passed in as an argument.
-- Implements exactly the method the paper describes: Eq. 1 through 10, the
+- Implements exactly the method: the capacity formula, toe bearing, shaft
+  resistance, liquefaction and residual strength relations, the
   unlogged-top-segment sweep, end-of-drive to long-term capacity, and the
   five-source Monte Carlo. Retired exploration modes from the research repo
   are not ported.
@@ -28,7 +28,7 @@ Equation numbers refer to the ASCE 2027 manuscript Methods section.
 
 ## 2. Units
 
-US customary throughout, matching the construction records and the paper:
+US customary throughout, matching the construction records:
 feet, kips, kips per square foot (ksf), degrees. The Danish formula inputs
 (ram weight, pile modulus, area) are therefore kips, ksf, and square feet.
 SI conversion helpers are deferred to a later release.
@@ -99,11 +99,11 @@ one hammer, and often one section, is shared across a project's logs.
 ```python
 @dataclass(frozen=True)
 class Pile:
-    area: float        # cross-section, ft^2 (A in Eq. 1 and the toe area)
+    area: float        # cross-section, ft^2 (A in the Danish formula and the toe area)
     perimeter: float   # ft
     width: float       # ft, B: sets the felt-zone height 1.5B and the z/B decay in K
-    length: float      # ft, L in Eq. 1 (total pile length)
-    modulus: float     # ksf, E in Eq. 1
+    length: float      # ft, L in the Danish formula (total pile length)
+    modulus: float     # ksf, E in the Danish formula
 
     @classmethod
     def octagonal(cls, width_in, length_ft, modulus_ksf=864_000.0) -> "Pile"
@@ -113,7 +113,7 @@ class Pile:
     def round(cls, diameter_in, length_ft, modulus_ksf=...) -> "Pile"
 ```
 
-The paper's pile: `Pile.octagonal(24, 150)` gives area 3.3125 ft^2,
+The benchmark pile: `Pile.octagonal(24, 150)` gives area 3.3125 ft^2,
 perimeter 6.627 ft, width 2.0 ft.
 
 ### 3.3 `Hammer`
@@ -121,10 +121,10 @@ perimeter 6.627 ft, width 2.0 ft.
 ```python
 @dataclass(frozen=True)
 class Hammer:
-    ram_weight: float          # kips, W in Eq. 1
+    ram_weight: float          # kips, W in the Danish formula
 ```
 
-Stroke comes from the log. The regional recalibration coefficients of Eq. 1
+Stroke comes from the log. The regional recalibration coefficients of the Danish formula
 are a property of the capacity formula, not the hammer, and live in
 `ModelOptions`.
 
@@ -142,35 +142,35 @@ class SoilProfile:
 ```
 
 One object per pile location: the mudline and the fines profile vary from
-pile to pile. To reproduce the paper's piles, the per-foot fines content the
+pile to pile. To reproduce the benchmark piles, the per-foot fines content the
 classifier produced is passed as the `elevation`, `fines` table.
 
 ### 3.5 `ModelOptions`
 
-Only the knobs the paper defines. Defaults are the paper's values.
+Only the knobs the method defines. Defaults reproduce the benchmark results.
 
 ```python
 @dataclass(frozen=True)
 class ModelOptions:
-    # capacity formula (Eq. 1): Puget Sound recalibrated Danish
+    # capacity formula: Puget Sound recalibrated Danish
     c1: float = 0.45               # multiplicative recalibration coefficient
     c2: float = 0.0                # kips, additive recalibration term
-    # friction angle bounds (Eq. 4 and the a-priori sweep)
+    # friction angle bounds (WSDOT correlation and the a-priori sweep)
     phi_lo: float = 25.0
     phi_hi: float = 45.0
-    # rigidity index (Eq. 3)
+    # rigidity index
     g_ratio: float = 0.05          # G / G_max at bearing-failure strain
     k2_lo: float = 30.0            # Seed-Idriss K2,max at phi_lo
     k2_hi: float = 75.0            # Seed-Idriss K2,max at phi_hi
     irr_bounds: tuple = (10.0, 500.0)
-    # shaft (Eq. 5, Eq. 10)
+    # shaft
     cc_delta_ratio: float = 0.8    # delta/phi' in the Coyle & Castello branch
     sr_psi_nc: float = 0.22        # (su/sigma'v)_NC in the Randolph-Murphy alpha
-    # liquefaction (Eq. 6-8)
+    # liquefaction
     zone_factor: float = 1.5       # felt zone starts zone_factor * B above a foot
     b_exponent: float = 0.34
     ru_cap_toe: float = 0.9
-    # perturbation hooks used by the Monte Carlo (0 and 1 = the paper line)
+    # perturbation hooks used by the Monte Carlo (0 and 1 = unperturbed)
     dphi: float = 0.0              # shift of the WSDOT phi(N160) line, deg
     crr_multiplier: float = 1.0
     # preprocessing of the log into the capacity target
@@ -186,9 +186,9 @@ class ModelOptions:
     ru_tol: float = 1e-4
 ```
 
-Fixed by the method, not options: 1-ft increments, linear ru growth
-(Eq. 8), 15-cycle CRR reference, Vesic bearing factor, `max(...)` shaft law
-(Eq. 10), Randolph-Murphy interface alpha, no toe setup, the reason codes
+Fixed by the method, not options: 1-ft increments, linear ru growth,
+15-cycle CRR reference, Vesic bearing factor, `max(...)` shaft law,
+Randolph-Murphy interface alpha, no toe setup, the reason codes
 for feet that cannot be reconciled, and the top-segment point estimate at the
 lowest admissible phi.
 
@@ -213,7 +213,7 @@ The top-segment phi is always drawn uniform over the admissible band.
 
 ```python
 def prepare_target(log, soil, options) -> Target
-    # Eq. 1 per foot, Savitzky-Golay smoothing, tip anchor, extension of the
+    # Danish formula per foot, Savitzky-Golay smoothing, tip anchor, extension of the
     # grid up to the mudline (unlogged top segment), sigma'_v0 profile, fines on grid.
 
 def sweep_top_phi(target, options) -> TopPhiBand
@@ -305,12 +305,12 @@ class Analysis:
 |---|---|---|
 | `inputs.py` | DriveLog, Pile, Hammer, SoilProfile, bpm_to_stroke, stroke_to_bpm | pile_driving.PileLog, import_log_file (parsing only), bpm_to_stroke; DriveParams geometry fields |
 | `options.py` | ModelOptions, MonteCarloOptions | DriveParams (46 fields -> 22), run_mc_ltc constants |
-| `formulas.py` | Eq. 1 recalibrated Danish | pile_driving.danish_ps_pile_capacity, s0_pile_capacity |
+| `formulas.py` | recalibrated Danish formula | pile_driving.danish_ps_pile_capacity, s0_pile_capacity |
 | `preprocess.py` | smoothing, tip anchor, mudline extension, sigma'_v0 grid | bayes_classify.capacity_savgol, drive_model.extend_to_mudline, sigma_v0_profile, run_drive_model.load_target |
-| `spt.py` | Eq. 4 and its inverse | liquefaction.wsdot_phi_from_n160, n160_from_phi |
-| `bearing.py` | Eq. 2, 3: Vesic Nq*, stress-dependent rigidity index, phi inversion | soil_capacity._Nq_vesic, qp_cohesionless, DriveParams.irr_of, drive_model._phi_fast |
-| `shaft.py` | Eq. 5, 10: Coyle & Castello K with Nordlund extension, partial-ru law, Randolph-Murphy alpha | drive_model.fs_coyle_castello, nordlund_kdelta, liq_interface_alpha, Sample.fs_* |
-| `liquefaction.py` | Eq. 6-9: CSR, Boulanger & Idriss CRR, NL, linear ru, Kramer & Wang Sr | liquefaction.py (minus retired ru_seed) |
+| `spt.py` | WSDOT phi(N1,60) and its inverse | liquefaction.wsdot_phi_from_n160, n160_from_phi |
+| `bearing.py` | Vesic Nq*, stress-dependent rigidity index, phi inversion | soil_capacity._Nq_vesic, qp_cohesionless, DriveParams.irr_of, drive_model._phi_fast |
+| `shaft.py` | Coyle & Castello K with Nordlund extension, partial-ru law, Randolph-Murphy alpha | drive_model.fs_coyle_castello, nordlund_kdelta, liq_interface_alpha, Sample.fs_* |
+| `liquefaction.py` | CSR, Boulanger & Idriss CRR, NL, linear ru, Kramer & Wang Sr | liquefaction.py (minus retired ru_seed) |
 | `march.py` | Sample, characterize_foot, run_drive | drive_model.run_drive and helpers |
 | `top_segment.py` | sweep_top_phi | run_drive_model.top_phi_range |
 | `capacity.py` | long_term_capacity | drive_model.ltc_parts (eod toe only) |
@@ -329,8 +329,9 @@ LTC variant.
 ## 7. Code conventions
 
 - Docstrings follow the numpy convention (Parameters, Returns, Notes,
-  References sections). Each equation-level function cites its equation
-  number and source in References.
+  References sections). Each equation-level function cites its original
+  published source in References, never Arnold (2027) or its equation
+  numbers.
 - PEP 8 and standard Python practice: type hints on public signatures,
   dataclasses for records, no module-level state, no bare `except`.
 - Comments describe what the code does. Design rationale, history, and
@@ -338,7 +339,7 @@ LTC variant.
 - Tests use pytest. Each equation gets a hand-calculated anchor test; each
   benchmark pile gets a regression test against the frozen outputs.
 
-## 8. Reproducing the paper
+## 8. Reproducing the benchmark results
 
 A test fixture per benchmark pile holds the Pier 4 log, mudline, per-foot
 fines, and the frozen outputs (tagged `paper-freeze-2026-10-23` in the
@@ -351,7 +352,7 @@ same phi, and checks the admissible band itself against the frozen one.
 
 1. US customary units only in v0.1.
 2. Fines content is an (elevation, fines) table or a single uniform value.
-3. `Hammer` carries only ram weight. The Eq. 1 recalibration coefficients
+3. `Hammer` carries only ram weight. The Danish formula recalibration coefficients
    are in `ModelOptions`.
 4. `DriveLog` mirrors `PileLog`: elevation, bpm, bpf, with stroke derived.
    No site-specific reader.
