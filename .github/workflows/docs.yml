@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m pip install uv
           uv sync
-          uv pip install great-docs
+          uv pip install git+https://github.com/posit-dev/great-docs.git
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
