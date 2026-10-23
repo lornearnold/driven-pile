@@ -16,3 +16,10 @@ _great_docs_build/
 .great-docs-build/
 .great-docs-cache/
 .great-docs/
+
+# Great Docs build output
+/docs/_quarto/
+/docs/_site/
+/docs/.cache/
+/.great-docs-build/
+/.great-docs/

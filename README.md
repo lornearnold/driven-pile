@@ -10,9 +10,10 @@ drive, and the end-of-drive characterization with pore pressure dissipated
 gives the long-term capacity, with uncertainty by Monte Carlo simulation.
 
 The package is a plain Python library: build a `DriveLog` (which carries
-its `Pile` and `Hammer`) and a `Site`, call `analyze`, and read the result.
+its `Pile` and `Hammer`) and a `SoilProfile`, call `analyze`, and read the
+result.
 
-**Status:** pre-release. The API in [docs/api_design.md](docs/api_design.md)
+**Status:** pre-release. The API in [llm/api_design.md](llm/api_design.md)
 is implemented and reproduces the research code behind the paper on its 15
 benchmark piles (see `tests/test_regression.py`).
 
@@ -26,20 +27,20 @@ hammer = dp.Hammer(ram_weight=20.0)                       # kips
 log = dp.DriveLog.from_csv("pile_B-25.5.csv", "B-25.5", pile, hammer,
                            depth="depth_ft", bpm="bpm", bpf="bpf",
                            tip_elevation=-141.0)
-fines = dp.FinesProfile(elevation=[-30, -80, -150], fines=[10, 35, 15])
-site = dp.Site(mudline=-30.0, fines=fines)                # ft, percent
+soil = dp.SoilProfile(mudline=-30.0,                      # ft
+                      elevation=[-30, -80, -150], fines=[10, 35, 15])  # ft, percent
 
-result = dp.analyze(log, site)
+result = dp.analyze(log, soil)
 print(result.drive.ltc, result.drive.ltc_shaft, result.drive.toe_eod)
 
-result = dp.analyze(log, site, run_mc=True)
+result = dp.analyze(log, soil, run_mc=True)
 print(result.mc.quantiles([0.05, 0.5, 0.95]))
 ```
 
 The deterministic result uses the lowest admissible friction angle for the
 unlogged top segment; `result.top_band` holds the whole admissible band.
-Fines content is required as a table of elevation versus percent fines
-because the method does not classify the soil itself.
+Fines content is given as a table of elevation versus percent fines, or a
+single value for a uniform profile.
 
 Units are US customary throughout (feet, kips, kips per square foot), matching
 the construction records the method was developed on.

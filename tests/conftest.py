@@ -30,9 +30,9 @@ def paper_inputs(fx):
         fx["pile_id"], paper_pile(fx["length_ft"]), dp.Hammer(ram_weight=20.0),
         bpf=fx["log"]["bpf"], bpm=fx["log"].get("bpm"), stroke=fx["log"].get("stroke"),
         elevation=fx["log"]["elevation"])
-    fines = dp.FinesProfile(np.array(fx["fines"]["elevation"]), np.array(fx["fines"]["fines"]))
-    site = dp.Site(mudline=fx["mudline"], fines=fines)
-    return log, site
+    soil = dp.SoilProfile(mudline=fx["mudline"], elevation=np.array(fx["fines"]["elevation"]),
+                          fines=np.array(fx["fines"]["fines"]))
+    return log, soil
 
 
 @pytest.fixture(params=fixture_ids())

@@ -9,7 +9,7 @@ repository `TCE_499_pile-driving` (branch clean-rebuild, tag
 `paper-freeze-2026-10-23`), which stays the home of the data, the manuscript,
 and the soil-classification work. Soil classification is out of scope here.
 
-Read docs/api_design.md before changing the public API and docs/status.md for
+Read llm/api_design.md before changing the public API and llm/status.md for
 where the work stands.
 
 ## Rules

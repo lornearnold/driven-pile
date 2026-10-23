@@ -75,7 +75,13 @@ def test_drive_log_from_csv_by_name(tmp_path):
     assert log.stroke[0] == pytest.approx(dp.bpm_to_stroke(40.0))
 
 
-def test_fines_profile_interpolates_and_holds_ends():
-    fp = dp.FinesProfile([-10.0, -30.0], [10.0, 50.0])
-    np.testing.assert_allclose(fp.at([0.0, -20.0, -40.0]), [10.0, 30.0, 50.0])
-    assert dp.FinesProfile.uniform(15.0).at(-123.0) == 15.0
+def test_soil_profile_interpolates_fines_and_holds_ends():
+    soil = dp.SoilProfile(mudline=-5.0, elevation=[-10.0, -30.0], fines=[10.0, 50.0])
+    np.testing.assert_allclose(soil.fines_at([0.0, -20.0, -40.0]), [10.0, 30.0, 50.0])
+
+
+def test_soil_profile_uniform_fines():
+    soil = dp.SoilProfile(mudline=-5.0, fines=15.0)
+    np.testing.assert_allclose(soil.fines_at([-1.0, -123.0]), [15.0, 15.0])
+    with pytest.raises(ValueError):
+        dp.SoilProfile(mudline=-5.0, fines=[10.0, 20.0])

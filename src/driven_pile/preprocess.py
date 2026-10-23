@@ -149,14 +149,14 @@ def extend_to_mudline(elevation, mudline):
     return np.concatenate([top, elev]), len(top)
 
 
-def prepare_target(log, site, options=None, min_feet=20):
+def prepare_target(log, soil, options=None, min_feet=20):
     """Build the capacity target from a driving log.
 
     Parameters
     ----------
     log : DriveLog
         The driving record, with its pile and hammer.
-    site : Site
+    soil : SoilProfile
         Mudline, water table, unit weight and fines content.
     options : ModelOptions, optional
         Formula coefficients and smoothing settings.
@@ -186,9 +186,9 @@ def prepare_target(log, site, options=None, min_feet=20):
     if options.tip_anchor:
         cap[-1] = raw[-1]
 
-    grid, n_top = extend_to_mudline(elev, site.mudline)
+    grid, n_top = extend_to_mudline(elev, soil.mudline)
     pad = np.full(n_top, np.nan)
-    surface = max(site.mudline, float(grid.max()))
+    surface = max(soil.mudline, float(grid.max()))
     return Target(
         pile_id=log.pile_id,
         pile=log.pile,
@@ -196,9 +196,9 @@ def prepare_target(log, site, options=None, min_feet=20):
         capacity=np.concatenate([pad, cap]),
         raw_capacity=np.concatenate([pad, raw]),
         bpf=np.concatenate([np.zeros(n_top), bpf]),
-        fines=site.fines.at(grid),
-        sigma_v0=sigma_v0_profile(grid, surface, site.gamma_total, site.water_elevation),
-        mudline=float(site.mudline),
+        fines=soil.fines_at(grid),
+        sigma_v0=sigma_v0_profile(grid, surface, soil.gamma_total, soil.water_elevation),
+        mudline=float(soil.mudline),
         n_top=n_top,
     )
 

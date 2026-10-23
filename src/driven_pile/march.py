@@ -172,15 +172,13 @@ def characterize_foot(foot, q_needed, felt_arrival, options):
     foot.ru = 1.0 if foot.liquefied else float(lq.ru_linear(felt_end, nl))
 
 
-def run_drive(target, site, options=None, top_phi=None):
+def run_drive(target, options=None, top_phi=None):
     """March the capacity target top down and characterize every foot.
 
     Parameters
     ----------
     target : Target
         Capacity target, pile and static soil state on the analysis grid.
-    site : Site
-        Ground conditions (the mudline sets the depth origin).
     options : ModelOptions, optional
     top_phi : float, optional
         Friction angle assigned to the unlogged top segment, deg. Required

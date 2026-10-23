@@ -10,14 +10,14 @@ from .results import Analysis
 from .top_segment import sweep_top_phi
 
 
-def analyze(log, site, options=None, mc_options=None, run_mc=False):
+def analyze(log, soil, options=None, mc_options=None, run_mc=False):
     """Characterize the soil from a driving log and estimate long-term capacity.
 
     Parameters
     ----------
     log : DriveLog
         The driving record, with its pile and hammer.
-    site : Site
+    soil : SoilProfile
         Mudline, water table, unit weight and fines content.
     options : ModelOptions, optional
         Model parameters; defaults to the published values.
@@ -33,11 +33,11 @@ def analyze(log, site, options=None, mc_options=None, run_mc=False):
         friction angle.
     """
     options = options or ModelOptions()
-    target = prepare_target(log, site, options)
-    band = sweep_top_phi(target, site, options)
-    drive = run_drive(target, site, options, top_phi=band.lo)
+    target = prepare_target(log, soil, options)
+    band = sweep_top_phi(target, options)
+    drive = run_drive(target, options, top_phi=band.lo)
     mc = None
     if run_mc:
-        mc = monte_carlo(log, site, options, mc_options or McOptions(),
+        mc = monte_carlo(log, soil, options, mc_options or McOptions(),
                          target=target, top_band=band)
     return Analysis(drive=drive, top_band=band, mc=mc)

@@ -8,7 +8,7 @@ Last updated 2026-10-23.
    (commit f542fb9); its docs/paper_freeze.md records the working-cell
    parameters, preprocessing constants, Monte Carlo sources and golden
    outputs for the 15 benchmark piles.
-2. **API design.** docs/api_design.md, reviewed by Lorne; decisions in its
+2. **API design.** llm/api_design.md, reviewed by Lorne; decisions in its
    section 9.
 3. **Repository.** github.com/lornearnold/driven-pile, public, MIT, hatchling,
    numpy and scipy only, Python 3.11+, GitHub Actions CI
@@ -43,8 +43,11 @@ stores bpm and bpf as the design specified, with stroke a derived property
 the research reader's bpm column holds stroke in feet on 10 of the 15
 benchmark logs, passed through by a magnitude check in its `bpm_to_stroke`.
 The package takes `stroke=` explicitly and inverts it with `stroke_to_bpm`;
-fixtures now carry whichever column the research log has. README and
-docs/api_design.md updated; the paper citation was removed from the README.
+fixtures now carry whichever column the research log has. `SoilProfile`
+replaces `Site` and `FinesProfile` (decision 9); `run_drive(target, options,
+top_phi)` and `sweep_top_phi(target, options)` no longer take a soil
+argument. README and
+llm/api_design.md updated; the paper citation was removed from the README.
 Tests pass (68 fast), lint clean. Lorne commits.
 
 ## Known differences from the research code, by design
@@ -57,7 +60,7 @@ Tests pass (68 fast), lint clean. Lorne commits.
 - The top-segment point estimate is the lowest admissible friction angle,
   not the noise-broken argmin of a flat RMS curve.
 - Per-pile mudline overrides and the Savitzky-Golay settings are inputs
-  (`Site.mudline`, `ModelOptions.smoothing_*`), not constants.
+  (`SoilProfile.mudline`, `ModelOptions.smoothing_*`), not constants.
 - The paper says the interface friction angle equals phi' (Eq. 5); the
   research code and the package use 0.8 phi' in the Coyle and Castello
   branch (`cc_delta_ratio`). Reconciling this is out of scope for now

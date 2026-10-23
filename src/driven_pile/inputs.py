@@ -1,4 +1,4 @@
-"""Input records: the driving log, the pile, the hammer, and the site."""
+"""Input records: the driving log, the pile, the hammer, and the soil profile."""
 
 from __future__ import annotations
 
@@ -329,49 +329,18 @@ class DriveLog:
 
 
 @dataclass(frozen=True)
-class FinesProfile:
-    """Fines content versus elevation.
-
-    Attributes
-    ----------
-    elevation : ndarray
-        Elevations of the table rows, ft.
-    fines : ndarray
-        Fines content (percent passing the No. 200 sieve) at each row.
-    """
-
-    elevation: np.ndarray
-    fines: np.ndarray
-
-    def __post_init__(self):
-        elevation = np.atleast_1d(np.asarray(self.elevation, dtype=float))
-        fines = np.atleast_1d(np.asarray(self.fines, dtype=float))
-        if elevation.shape != fines.shape:
-            raise ValueError("elevation and fines must have the same length")
-        order = np.argsort(elevation)
-        object.__setattr__(self, "elevation", elevation[order])
-        object.__setattr__(self, "fines", fines[order])
-
-    @classmethod
-    def uniform(cls, fines):
-        """A profile with the same fines content at every elevation."""
-        return cls(np.array([-1e6, 1e6]), np.array([fines, fines], dtype=float))
-
-    def at(self, elevation):
-        """Fines content interpolated at the given elevations, end values held."""
-        return np.interp(np.asarray(elevation, dtype=float), self.elevation, self.fines)
-
-
-@dataclass(frozen=True)
-class Site:
-    """Ground conditions at the pile.
+class SoilProfile:
+    """Ground conditions at a pile location.
 
     Attributes
     ----------
     mudline : float
         Elevation of the soil surface the pile was driven through, ft.
-    fines : FinesProfile
-        Fines content versus elevation.
+    fines : ndarray
+        Fines content (percent passing the No. 200 sieve) at each row of
+        ``elevation``. A single value gives a uniform profile.
+    elevation : ndarray or None
+        Elevations of the fines rows, ft; None for a uniform profile.
     water_elevation : float, default 0.0
         Elevation of the water table, ft.
     gamma_total : float, default 0.122
@@ -379,6 +348,28 @@ class Site:
     """
 
     mudline: float
-    fines: FinesProfile
+    fines: np.ndarray
+    elevation: np.ndarray | None = None
     water_elevation: float = 0.0
     gamma_total: float = 0.122
+
+    def __post_init__(self):
+        fines = np.atleast_1d(np.asarray(self.fines, dtype=float))
+        if self.elevation is None:
+            if fines.size != 1:
+                raise ValueError("elevation is required when fines varies")
+            object.__setattr__(self, "fines", fines)
+            return
+        elevation = np.atleast_1d(np.asarray(self.elevation, dtype=float))
+        if elevation.shape != fines.shape:
+            raise ValueError("elevation and fines must have the same length")
+        order = np.argsort(elevation)
+        object.__setattr__(self, "elevation", elevation[order])
+        object.__setattr__(self, "fines", fines[order])
+
+    def fines_at(self, elevation):
+        """Fines content interpolated at the given elevations, end values held."""
+        elevation = np.asarray(elevation, dtype=float)
+        if self.elevation is None:
+            return np.full(elevation.shape, self.fines[0])
+        return np.interp(elevation, self.elevation, self.fines)

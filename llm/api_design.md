@@ -2,7 +2,8 @@
 
 Status: revised 2026-10-23 after review; implemented the same day in
 `src/driven_pile/`. Revised again 2026-10-23: `DriveLog` carries its `Pile`
-and `Hammer` (decision 8).
+and `Hammer` (decision 8); `SoilProfile` replaces `Site` and `FinesProfile`
+(decision 9).
 Equation numbers refer to the ASCE 2027 manuscript Methods section.
 
 ## 1. Scope and principles
@@ -127,25 +128,22 @@ Stroke comes from the log. The regional recalibration coefficients of Eq. 1
 are a property of the capacity formula, not the hammer, and live in
 `ModelOptions`.
 
-### 3.4 `Site`
+### 3.4 `SoilProfile`
 
 ```python
 @dataclass(frozen=True)
-class Site:
-    mudline: float                # ft, elevation of the soil surface the pile was driven through
-    fines: FinesProfile           # fines content versus elevation
-    water_elevation: float = 0.0  # ft; water table for sigma'_v0
-    gamma_total: float = 0.122    # ksf/ft, total unit weight
-
-@dataclass(frozen=True)
-class FinesProfile:
-    elevation: np.ndarray         # ft, descending or ascending
-    fines: np.ndarray             # percent passing No. 200
-    def at(self, elevation) -> np.ndarray   # linear interpolation, end values held
+class SoilProfile:
+    mudline: float                      # ft, elevation of the soil surface the pile was driven through
+    fines: np.ndarray                   # percent passing No. 200, at each row of elevation
+    elevation: np.ndarray | None = None # ft; None for a uniform profile (fines is one value)
+    water_elevation: float = 0.0        # ft; water table for sigma'_v0
+    gamma_total: float = 0.122          # ksf/ft, total unit weight
+    def fines_at(self, elevation) -> np.ndarray   # linear interpolation, end values held
 ```
 
-A uniform profile is a two-row table. To reproduce the paper's piles, the
-per-foot FC the classifier produced is passed in as a `FinesProfile`.
+One object per pile location: the mudline and the fines profile vary from
+pile to pile. To reproduce the paper's piles, the per-foot fines content the
+classifier produced is passed as the `elevation`, `fines` table.
 
 ### 3.5 `ModelOptions`
 
@@ -214,28 +212,28 @@ The top-segment phi is always drawn uniform over the admissible band.
 ## 4. Pipeline functions
 
 ```python
-def prepare_target(log, site, options) -> Target
+def prepare_target(log, soil, options) -> Target
     # Eq. 1 per foot, Savitzky-Golay smoothing, tip anchor, extension of the
     # grid up to the mudline (unlogged top segment), sigma'_v0 profile, fines on grid.
 
-def sweep_top_phi(target, site, options) -> TopPhiBand
+def sweep_top_phi(target, options) -> TopPhiBand
     # constant-phi sweep over [phi_lo, phi_hi]; returns lo, hi and the RMS curve
 
-def run_drive(target, site, options, top_phi: float) -> DriveResult
+def run_drive(target, options, top_phi: float) -> DriveResult
     # the top-down marching solve, per-foot characterization
 
 def long_term_capacity(result) -> tuple[float, float]
     # (shaft_kips, toe_eod_kips); toe is the end-of-drive value, no toe setup
 
-def monte_carlo(log, site, options, mc_options) -> McResult
+def monte_carlo(log, soil, options, mc_options) -> McResult
 
-def analyze(log, site, options=None, mc_options=None, run_mc=False) -> Analysis
+def analyze(log, soil, options=None, mc_options=None, run_mc=False) -> Analysis
 ```
 
 `Target` is a public dataclass (pile, elevation, capacity, bpf, fines,
-sigma_v0, n_top) so a user can inspect or replace the capacity target. It
-carries the pile forward from the log so the later stages need only the
-target and the site. The
+sigma_v0, mudline, n_top) so a user can inspect or replace the capacity
+target. It carries the pile and the soil state forward, so `sweep_top_phi`
+and `run_drive` take only the target and the options. The
 deterministic `analyze` uses the lowest admissible top-segment phi.
 
 ## 5. Results
@@ -305,7 +303,7 @@ class Analysis:
 
 | new module | content | from (TCE_499_pile-driving) |
 |---|---|---|
-| `inputs.py` | DriveLog, Pile, Hammer, Site, FinesProfile, bpm_to_stroke | pile_driving.PileLog, import_log_file (parsing only), bpm_to_stroke; DriveParams geometry fields |
+| `inputs.py` | DriveLog, Pile, Hammer, SoilProfile, bpm_to_stroke, stroke_to_bpm | pile_driving.PileLog, import_log_file (parsing only), bpm_to_stroke; DriveParams geometry fields |
 | `options.py` | ModelOptions, McOptions | DriveParams (46 fields -> 22), run_mc_ltc constants |
 | `formulas.py` | Eq. 1 recalibrated Danish | pile_driving.danish_ps_pile_capacity, s0_pile_capacity |
 | `preprocess.py` | smoothing, tip anchor, mudline extension, sigma'_v0 grid | bayes_classify.capacity_savgol, drive_model.extend_to_mudline, sigma_v0_profile, run_drive_model.load_target |
@@ -352,7 +350,7 @@ same phi, and checks the admissible band itself against the frozen one.
 ## 9. Decisions recorded (review of 2026-10-23)
 
 1. US customary units only in v0.1.
-2. Fines content is an (elevation, fines) table; no other input form.
+2. Fines content is an (elevation, fines) table or a single uniform value.
 3. `Hammer` carries only ram weight. The Eq. 1 recalibration coefficients
    are in `ModelOptions`.
 4. `DriveLog` mirrors `PileLog`: elevation, bpm, bpf, with stroke derived.
@@ -362,4 +360,10 @@ same phi, and checks the admissible band itself against the frozen one.
 7. The deterministic top-segment phi is the lowest admissible value.
 8. `DriveLog` requires a `Pile` and a `Hammer` (Lorne, 2026-10-23): a log
    cannot exist without them. `Target` carries the pile, so every pipeline
-   function after the log takes only `(log or target, site, options)`.
+   function after the log takes only `(log or target, soil, options)`.
+9. `Site` and `FinesProfile` are replaced by one `SoilProfile` (Lorne,
+   2026-10-23): "Site" suggested a shared object when the mudline and fines
+   vary per pile, and a separate class for one interpolated column was more
+   structure than the concept needed. The mudline stays with the soil
+   profile. `run_drive` and `sweep_top_phi` drop the soil argument, which
+   they never read.

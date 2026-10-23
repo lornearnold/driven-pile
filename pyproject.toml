@@ -4,10 +4,9 @@ version = "0.0.1"
 description = "Long-term capacity of driven piles from the pile-driving log: a pore-pressure-tracking inversion of blow counts (Arnold, ASCE 2027)."
 readme = "README.md"
 license = "MIT"
-authors = [{ name = "Lorne Arnold", email = "arnoldl@uw.edu" }]
+authors = [{ name = "Lorne Arnold"}]
 requires-python = ">=3.11"
 dependencies = [
-    "great-docs>=0.17.0",
     "numpy>=1.26",
     "scipy>=1.11",
 ]
@@ -34,6 +33,10 @@ packages = ["src/driven_pile"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
+docs = ["great-docs"]
+
+[tool.uv.sources]
+great-docs = { git = "https://github.com/posit-dev/great-docs.git" }
 
 [tool.ruff]
 line-length = 99
