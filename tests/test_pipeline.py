@@ -38,7 +38,7 @@ def test_monte_carlo_is_seeded_and_shaped(inputs):
     target = dp.prepare_target(log, soil)
     band = dp.TopPhiBand(phi=np.array([]), rms=np.array([]),
                          lo=fx["band"]["lo"], hi=fx["band"]["hi"])
-    opts = dp.McOptions(chunk=5, max_realizations=10, seed=3)
+    opts = dp.MonteCarloOptions(chunk=5, max_realizations=10, seed=3)
     a = dp.monte_carlo(log, soil, mc_options=opts, target=target, top_band=band)
     b = dp.monte_carlo(log, soil, mc_options=opts, target=target, top_band=band)
     assert a.n == 10

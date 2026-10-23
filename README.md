@@ -19,13 +19,13 @@ pile = dp.Pile.octagonal(width_in=24, length_ft=150)
 hammer = dp.Hammer(ram_weight=20.0)  # kips
 log = dp.DriveLog.from_csv(
     "pile_B-25.5.csv",
-    "B-25.5",
     pile,
     hammer,
     depth="depth_ft",
     bpm="bpm",
     bpf="bpf",
     tip_elevation=-141.0,
+    pile_id="B-25.5",
 )
 soil = dp.SoilProfile(
     mudline=-30.0,  # ft

@@ -148,8 +148,6 @@ class DriveLog:
 
     Attributes
     ----------
-    pile_id : str
-        Identifier of the pile.
     pile : Pile
         The pile that was driven.
     hammer : Hammer
@@ -160,14 +158,16 @@ class DriveLog:
         Hammer blows per minute.
     bpf : ndarray
         Blows per foot.
+    pile_id : str, optional
+        Identifier of the pile.
     """
 
-    pile_id: str
     pile: Pile
     hammer: Hammer
     elevation: np.ndarray
     bpm: np.ndarray
     bpf: np.ndarray
+    pile_id: str | None = None
 
     def __post_init__(self):
         self.elevation = np.asarray(self.elevation, dtype=float)
@@ -193,15 +193,13 @@ class DriveLog:
         return np.nanmax(self.elevation) - self.elevation
 
     @classmethod
-    def from_arrays(cls, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+    def from_arrays(cls, pile, hammer, *, bpf, bpm=None, stroke=None,
                     elevation=None, depth=None, tip_elevation=None,
-                    forward_fill=False):
+                    forward_fill=False, pile_id=None):
         """Build a log from per-foot arrays.
 
         Parameters
         ----------
-        pile_id : str
-            Identifier of the pile.
         pile : Pile
             The pile that was driven.
         hammer : Hammer
@@ -264,20 +262,18 @@ class DriveLog:
             depth = depth[sl]
             elevation = float(tip_elevation) + depth[-1] - depth
 
-        return cls(pile_id, pile, hammer, elevation, bpm, bpf)
+        return cls(pile, hammer, elevation, bpm, bpf, pile_id=pile_id)
 
     @classmethod
-    def from_csv(cls, path, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+    def from_csv(cls, path, pile, hammer, *, bpf, bpm=None, stroke=None,
                  elevation=None, depth=None, tip_elevation=None, skiprows=0,
-                 delimiter=",", forward_fill=False):
+                 delimiter=",", forward_fill=False, pile_id=None):
         """Read a log from a delimited text file.
 
         Parameters
         ----------
         path : str or Path
             File to read.
-        pile_id : str
-            Identifier of the pile.
         pile : Pile
             The pile that was driven.
         hammer : Hammer
@@ -295,6 +291,8 @@ class DriveLog:
             Field delimiter.
         forward_fill : bool, default False
             See `from_arrays`.
+        pile_id : str, optional
+            Identifier of the pile.
 
         Returns
         -------
@@ -321,10 +319,10 @@ class DriveLog:
 
         cols = {k: column(j) for k, j in given.items()}
         return cls.from_arrays(
-            pile_id, pile, hammer, bpf=cols["bpf"], bpm=cols.get("bpm"),
+            pile, hammer, bpf=cols["bpf"], bpm=cols.get("bpm"),
             stroke=cols.get("stroke"), elevation=cols.get("elevation"),
             depth=cols.get("depth"), tip_elevation=tip_elevation,
-            forward_fill=forward_fill,
+            forward_fill=forward_fill, pile_id=pile_id,
         )
 
 

@@ -55,7 +55,7 @@ Tests pass (68 fast), lint clean. Lorne commits.
 - No rounding of the per-foot formula capacity to whole kips.
 - `Pile.octagonal(24, 150)` computes the true octagon area (3.3137 ft^2);
   the research code and the tests use the nominal 477 in^2 (3.3125 ft^2).
-- `McOptions.ci_target` defaults to 0.02 as the paper states; the research
+- `MonteCarloOptions.ci_target` defaults to 0.02 as the paper states; the research
   runs used 0.05.
 - The top-segment point estimate is the lowest admissible friction angle,
   not the noise-broken argmin of a flat RMS curve.

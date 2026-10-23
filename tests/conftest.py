@@ -27,9 +27,9 @@ def paper_pile(length_ft):
 
 def paper_inputs(fx):
     log = dp.DriveLog.from_arrays(
-        fx["pile_id"], paper_pile(fx["length_ft"]), dp.Hammer(ram_weight=20.0),
+        paper_pile(fx["length_ft"]), dp.Hammer(ram_weight=20.0),
         bpf=fx["log"]["bpf"], bpm=fx["log"].get("bpm"), stroke=fx["log"].get("stroke"),
-        elevation=fx["log"]["elevation"])
+        elevation=fx["log"]["elevation"], pile_id=fx["pile_id"])
     soil = dp.SoilProfile(mudline=fx["mudline"], elevation=np.array(fx["fines"]["elevation"]),
                           fines=np.array(fx["fines"]["fines"]))
     return log, soil

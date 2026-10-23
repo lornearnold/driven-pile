@@ -45,12 +45,12 @@ Mirrors the research repo's `PileLog`, less the site-specific fields
 ```python
 @dataclass
 class DriveLog:
-    pile_id: str
     pile: Pile                 # the pile that was driven
     hammer: Hammer             # the hammer that drove it
     elevation: np.ndarray      # ft, toe elevation at the end of each logged foot
     bpm: np.ndarray            # hammer blows per minute
     bpf: np.ndarray            # blows per foot
+    pile_id: str | None = None # optional identifier, carried into Target and DriveResult
 
     @property
     def valid(self) -> np.ndarray       # bool, True where elevation, bpm and bpf are all finite
@@ -60,13 +60,13 @@ class DriveLog:
     def depth(self) -> np.ndarray       # ft below the first logged foot
 
     @classmethod
-    def from_arrays(cls, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+    def from_arrays(cls, pile, hammer, *, bpf, bpm=None, stroke=None,
                     elevation=None, depth=None, tip_elevation=None,
-                    forward_fill=False) -> "DriveLog"
+                    forward_fill=False, pile_id=None) -> "DriveLog"
     @classmethod
-    def from_csv(cls, path, pile_id, pile, hammer, *, bpf, bpm=None, stroke=None,
+    def from_csv(cls, path, pile, hammer, *, bpf, bpm=None, stroke=None,
                  elevation=None, depth=None, tip_elevation=None, skiprows=0,
-                 forward_fill=False) -> "DriveLog"
+                 forward_fill=False, pile_id=None) -> "DriveLog"
 ```
 
 A log cannot exist without the pile and hammer that produced it, so both are
@@ -192,11 +192,11 @@ Fixed by the method, not options: 1-ft increments, linear ru growth
 for feet that cannot be reconciled, and the top-segment point estimate at the
 lowest admissible phi.
 
-### 3.6 `McOptions`
+### 3.6 `MonteCarloOptions`
 
 ```python
 @dataclass(frozen=True)
-class McOptions:
+class MonteCarloOptions:
     bias_cov: float = 0.35         # lognormal, mean 1, per realization (Reddy & Stuedlein 2013)
     crr_sigma_ln: float = 0.20     # lognormal model error on CRR
     dphi_bound: float = 2.5        # uniform +/- deg on the phi(N160) line
@@ -225,7 +225,7 @@ def run_drive(target, options, top_phi: float) -> DriveResult
 def long_term_capacity(result) -> tuple[float, float]
     # (shaft_kips, toe_eod_kips); toe is the end-of-drive value, no toe setup
 
-def monte_carlo(log, soil, options, mc_options) -> McResult
+def monte_carlo(log, soil, options, mc_options) -> MonteCarloResult
 
 def analyze(log, soil, options=None, mc_options=None, run_mc=False) -> Analysis
 ```
@@ -271,7 +271,7 @@ class DriveResult:
     def plot_fit(self, ax=None)       # target vs predicted capacity vs elevation
 
 @dataclass
-class McResult:
+class MonteCarloResult:
     ltc: np.ndarray             # one value per realization
     shaft: np.ndarray
     toe_eod: np.ndarray
@@ -296,7 +296,7 @@ class TopPhiBand:
 class Analysis:
     drive: DriveResult
     top_band: TopPhiBand
-    mc: McResult | None
+    mc: MonteCarloResult | None
 ```
 
 ## 6. Module layout and mapping from the research repo
@@ -304,7 +304,7 @@ class Analysis:
 | new module | content | from (TCE_499_pile-driving) |
 |---|---|---|
 | `inputs.py` | DriveLog, Pile, Hammer, SoilProfile, bpm_to_stroke, stroke_to_bpm | pile_driving.PileLog, import_log_file (parsing only), bpm_to_stroke; DriveParams geometry fields |
-| `options.py` | ModelOptions, McOptions | DriveParams (46 fields -> 22), run_mc_ltc constants |
+| `options.py` | ModelOptions, MonteCarloOptions | DriveParams (46 fields -> 22), run_mc_ltc constants |
 | `formulas.py` | Eq. 1 recalibrated Danish | pile_driving.danish_ps_pile_capacity, s0_pile_capacity |
 | `preprocess.py` | smoothing, tip anchor, mudline extension, sigma'_v0 grid | bayes_classify.capacity_savgol, drive_model.extend_to_mudline, sigma_v0_profile, run_drive_model.load_target |
 | `spt.py` | Eq. 4 and its inverse | liquefaction.wsdot_phi_from_n160, n160_from_phi |
@@ -315,7 +315,7 @@ class Analysis:
 | `top_segment.py` | sweep_top_phi | run_drive_model.top_phi_range |
 | `capacity.py` | long_term_capacity | drive_model.ltc_parts (eod toe only) |
 | `montecarlo.py` | monte_carlo | run_mc_ltc.run_realization (no CSV cache, no multiprocessing coupling) |
-| `results.py` | DriveResult, McResult, TopPhiBand, Analysis | DriveResult.report, result CSV writers |
+| `results.py` | DriveResult, MonteCarloResult, TopPhiBand, Analysis | DriveResult.report, result CSV writers |
 | `plots.py` | optional matplotlib helpers | figures/drive_model_profiles.py, mc_uncertainty.py (simplified) |
 
 Not ported: bayes_classify, soil_inversion (superseded by drive_model),

@@ -7,9 +7,9 @@ from dataclasses import replace
 import numpy as np
 
 from .march import run_drive
-from .options import McOptions, ModelOptions
+from .options import ModelOptions, MonteCarloOptions
 from .preprocess import prepare_target, residual_scale
-from .results import McResult
+from .results import MonteCarloResult
 from .top_segment import sweep_top_phi
 
 
@@ -22,7 +22,7 @@ def monte_carlo(log, soil, options=None, mc_options=None, *,
     log : DriveLog
     soil : SoilProfile
     options : ModelOptions, optional
-    mc_options : McOptions, optional
+    mc_options : MonteCarloOptions, optional
     target : Target, optional
         Precomputed capacity target; built from the log when omitted.
     top_band : TopPhiBand, optional
@@ -30,7 +30,7 @@ def monte_carlo(log, soil, options=None, mc_options=None, *,
 
     Returns
     -------
-    McResult
+    MonteCarloResult
 
     Notes
     -----
@@ -44,7 +44,7 @@ def monte_carlo(log, soil, options=None, mc_options=None, *,
     is reached.
     """
     options = options or ModelOptions()
-    mc = mc_options or McOptions()
+    mc = mc_options or MonteCarloOptions()
     if target is None:
         target = prepare_target(log, soil, options)
     if top_band is None:
@@ -93,7 +93,7 @@ def monte_carlo(log, soil, options=None, mc_options=None, *,
         if col.size:
             phi_q[k] = np.percentile(col, pct)
 
-    return McResult(
+    return MonteCarloResult(
         ltc=np.asarray(draws["ltc"]),
         shaft=np.asarray(draws["shaft"]),
         toe_eod=np.asarray(draws["toe_eod"]),

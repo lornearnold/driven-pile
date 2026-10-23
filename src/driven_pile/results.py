@@ -19,8 +19,6 @@ class DriveResult:
 
     Attributes
     ----------
-    pile_id : str
-        Identifier of the pile.
     elevation : ndarray
         Elevation of each foot, ft.
     depth : ndarray
@@ -83,9 +81,10 @@ class DriveResult:
         Pile used for the run.
     options : ModelOptions
         Options used for the run.
+    pile_id : str, optional
+        Identifier of the pile.
     """
 
-    pile_id: str
     elevation: np.ndarray
     depth: np.ndarray
     sigma_v0: np.ndarray
@@ -116,6 +115,7 @@ class DriveResult:
     rms_kips: float
     pile: object
     options: ModelOptions
+    pile_id: str | None = None
 
     @property
     def n_logged(self) -> int:
@@ -171,7 +171,7 @@ class TopPhiBand:
 
 
 @dataclass
-class McResult:
+class MonteCarloResult:
     """Monte Carlo realizations of the long-term capacity.
 
     Attributes
@@ -253,10 +253,10 @@ class Analysis:
         Deterministic run at the lowest admissible top-segment friction angle.
     top_band : TopPhiBand
         Admissible top-segment friction angles.
-    mc : McResult or None
+    mc : MonteCarloResult or None
         Monte Carlo realizations, when requested.
     """
 
     drive: DriveResult
     top_band: TopPhiBand
-    mc: McResult | None = None
+    mc: MonteCarloResult | None = None

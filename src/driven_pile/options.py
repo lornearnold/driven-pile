@@ -85,7 +85,7 @@ class ModelOptions:
 
 
 @dataclass(frozen=True)
-class McOptions:
+class MonteCarloOptions:
     """Monte Carlo settings.
 
     Attributes

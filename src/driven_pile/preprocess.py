@@ -22,8 +22,6 @@ class Target:
 
     Attributes
     ----------
-    pile_id : str
-        Identifier of the pile.
     pile : Pile
         The pile that was driven.
     elevation : ndarray
@@ -42,9 +40,10 @@ class Target:
         Elevation of the soil surface, ft.
     n_top : int
         Number of unlogged feet above the first logged foot.
+    pile_id : str, optional
+        Identifier of the pile.
     """
 
-    pile_id: str
     pile: Pile
     elevation: np.ndarray
     capacity: np.ndarray
@@ -54,6 +53,7 @@ class Target:
     sigma_v0: np.ndarray
     mudline: float
     n_top: int
+    pile_id: str | None = None
 
     @property
     def n_logged(self) -> int:
@@ -175,7 +175,8 @@ def prepare_target(log, soil, options=None, min_feet=20):
     options = options or ModelOptions()
     m = log.valid
     if m.sum() < min_feet:
-        raise ValueError(f"{log.pile_id}: only {int(m.sum())} valid feet; need {min_feet}")
+        who = f"{log.pile_id}: " if log.pile_id else ""
+        raise ValueError(f"{who}only {int(m.sum())} valid feet; need {min_feet}")
     elev = log.elevation[m]
     order = np.argsort(-elev)
     elev = elev[order]

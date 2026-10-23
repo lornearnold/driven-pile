@@ -67,7 +67,7 @@ def plot_ltc(mc, ax=None):
 
     Parameters
     ----------
-    mc : McResult
+    mc : MonteCarloResult
     ax : Axes, optional
 
     Returns
