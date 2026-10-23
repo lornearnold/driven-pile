@@ -3,6 +3,17 @@ title: Walkthrough on a benchmark log
 description: Load a Pier 4 driving record, build the capacity target, sweep the unlogged top segment, run the march, and propagate the uncertainty.
 ---
 
+```{python}
+#| include: false
+import matplotlib as mpl
+
+mpl.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["STIX Two Text"],
+    "mathtext.fontset": "stix",
+})
+```
+
 This example steps through the method on one of the benchmark piles,
 pile B-20 of the Pier 4 data set. Each stage of `analyze`
 is run by hand so that its inputs and outputs can be inspected. The

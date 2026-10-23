@@ -2,6 +2,17 @@
 title: Quick start
 ---
 
+```{python}
+#| include: false
+import matplotlib as mpl
+
+mpl.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["STIX Two Text"],
+    "mathtext.fontset": "stix",
+})
+```
+
 This page runs a deterministic analysis on ten feet of a driving record
 typed in by hand. The [walkthrough](../examples/walkthrough.qmd) does the same
 on a full benchmark log and explains each stage.

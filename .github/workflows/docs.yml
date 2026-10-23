@@ -27,6 +27,15 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      - name: Install STIX Two Text for the example figures
+        run: |
+          mkdir -p ~/.local/share/fonts
+          for style in Regular Italic Bold BoldItalic; do
+            curl -fsSL -o ~/.local/share/fonts/STIXTwoText-$style.otf \
+              https://raw.githubusercontent.com/stipub/stixfonts/v2.13/fonts/static_otf/STIXTwoText-$style.otf
+          done
+          fc-cache -f
+
       - name: Build docs
         run: uv run great-docs build
 
