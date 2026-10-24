@@ -58,9 +58,9 @@ print(f"Soil-pile contact: {len(target.elevation)} feet ({target.n_top} unlogged
 ```
 
 ```{python}
-#| fig-cap: Formula capacity per foot (points) and the smoothed target (line).
+#| fig-cap: Danish formula capacity per foot (points) and the smoothed target (line).
 fig, ax = plt.subplots(figsize=(4.5, 6))
-ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="formula per foot")
+ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="Danish formula")
 ax.plot(target.capacity, target.elevation, color="C0", label="smoothed target")
 ax.axhline(target.mudline, color="k", lw=0.8, ls="--", label="mudline")
 ax.set_xlabel("capacity at time of driving (kips)")
@@ -89,11 +89,13 @@ ax.grid(True, alpha=0.3)
 plt.show()
 ```
 <!-- Reword: log cannot distinguish -->
-The log cannot distinguish between angles inside the band. The deterministic analysis uses the lowest one; the Monte Carlo draws from the whole band.
+Within the shaded band, the sequential implicit characterization (next section) is able to find equally valid solutions for soil friction angle throughout the log.
+In a deterministic analysis, the lowest valid friction angle is selected for the long-term capacity estimate.
+In the probabilistic analysis, each realization draws randomply from the entire shaded band.
 
 ## Stage 3: sequential implicit characterization
 
-`run_drive` characterizes each logged foot in sequence from the toe resistance the target demands after subtracting the shaft resistance of the feet above in their current state. At each foot the friction angle and the toe pore-pressure ratio are solved together, since each depends on the other, and the blows of that foot raise the pore pressure of the feet above for every later step.
+`run_drive` characterizes each logged foot in sequence from the toe resistance the target demands after subtracting the shaft resistance of the feet above in their current state. At each foot the friction angle required to produce the toe resistance and the toe pore-pressure ratio are found iteratively, since each depends on the other. The blows also affect the pore pressure in the soil above the toe, updating the shaft resistance state for the next characterization in the foot-by-foot sequence.
 
 ```{python}
 result = dp.run_drive(target, top_phi=band.lo)
