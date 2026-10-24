@@ -1,6 +1,6 @@
 ---
 title: Walkthrough on a benchmark log
-description: Load a Pier 4 driving record, build the capacity target, sweep the unlogged top segment, run the march, and propagate the uncertainty.
+description: Load a Pier 4 driving record, build the capacity target, sweep the unlogged top segment, characterize the soil foot by foot, and propagate the uncertainty.
 ---
 
 ```{python}
@@ -41,7 +41,7 @@ print(f"{len(log.elevation)} logged feet, "
       f"from {log.elevation.max():.1f} to {log.elevation.min():.1f} ft")
 ```
 
-The fines content comes from a second table of elevation versus percent passing the No. 200 sieve. The mudline at this pile is 50 ft below datum, 32 ft above the first logged foot.
+The fines content comes from a second table of elevation versus percent passing the No. 200 sieve. The mudline at this pile is at elevation -50 ft, 32 ft above the first logged foot.
 
 ```{python}
 fines = np.loadtxt("data/B-20_fines.csv", delimiter=",", skiprows=1)
@@ -50,11 +50,11 @@ soil = dp.SoilProfile(mudline=-50.0, elevation=fines[:, 0], fines=fines[:, 1])
 
 ## Stage 1: the capacity target
 
-`prepare_target` applies the recalibrated Danish formula to each foot, smooths the result with a Savitzky-Golay filter, anchors the final foot to its unsmoothed value, and extends the grid up to the mudline.
+`prepare_target` applies the recalibrated Danish formula to each foot, smooths the result with a Savitzky-Golay filter, anchors the final foot to its unsmoothed value, and extends the elevation range up to the mudline.
 
 ```{python}
 target = dp.prepare_target(log, soil)
-print(f"grid of {len(target.elevation)} feet, {target.n_top} of them unlogged")
+print(f"Soil-pile contact: {len(target.elevation)} feet ({target.n_top} unlogged)")
 ```
 
 ```{python}
@@ -62,17 +62,16 @@ print(f"grid of {len(target.elevation)} feet, {target.n_top} of them unlogged")
 fig, ax = plt.subplots(figsize=(4.5, 6))
 ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="formula per foot")
 ax.plot(target.capacity, target.elevation, color="C0", label="smoothed target")
-ax.axhline(target.mudline, color="k", lw=0.8, ls="--")
+ax.axhline(target.mudline, color="k", lw=0.8, ls="--", label="mudline")
 ax.set_xlabel("capacity at time of driving (kips)")
 ax.set_ylabel("elevation (ft)")
-ax.legend(loc="lower left")
+ax.legend(loc="upper right", framealpha=1.0)
 ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
 ## Stage 2: the unlogged top segment
-
-The pile passed through 32 ft of soil before the inspector started logging. `sweep_top_phi` assigns a constant friction angle to that segment, runs the march for each value from 25 to 45 degrees, and records the root-mean-square misfit between the modeled and target capacities over the logged feet.
+The pile passed through 32 ft of soil before the inspector started logging. `sweep_top_phi` assigns a constant friction angle to that segment, runs the characterization for each value from 25 to 45 degrees, and records the root-mean-square misfit between the modeled and target capacities over the logged feet.
 
 ```{python}
 band = dp.sweep_top_phi(target)
@@ -80,7 +79,7 @@ print(f"admissible top-segment friction angle: {band.lo:.0f} to {band.hi:.0f} de
 ```
 
 ```{python}
-#| fig-cap: Misfit of the march versus the assumed top-segment friction angle. The shaded range is the admissible band.
+#| fig-cap: Misfit of the characterization versus the assumed top-segment friction angle. The shaded range is the admissible band.
 fig, ax = plt.subplots(figsize=(5, 3.5))
 ax.plot(band.phi, band.rms, "o-")
 ax.axvspan(band.lo, band.hi, color="C0", alpha=0.15)
@@ -89,12 +88,12 @@ ax.set_ylabel("RMS misfit (kips)")
 ax.grid(True, alpha=0.3)
 plt.show()
 ```
-
+<!-- Reword: log cannot distinguish -->
 The log cannot distinguish between angles inside the band. The deterministic analysis uses the lowest one; the Monte Carlo draws from the whole band.
 
-## Stage 3: the march
+## Stage 3: sequential implicit characterization
 
-`run_drive` characterizes each logged foot from the toe resistance the target demands after subtracting the shaft resistance of the feet above, and tracks the pore pressure that later blows generate in every foot.
+`run_drive` characterizes each logged foot in sequence from the toe resistance the target demands after subtracting the shaft resistance of the feet above in their current state. At each foot the friction angle and the toe pore-pressure ratio are solved together, since each depends on the other, and the blows of that foot raise the pore pressure of the feet above for every later step.
 
 ```{python}
 result = dp.run_drive(target, top_phi=band.lo)
@@ -153,7 +152,7 @@ plt.show()
 
 ## Stage 5: Monte Carlo
 
-`monte_carlo` repeats the march with the five uncertainty sources drawn per realization. The target and the band computed above are passed in so they are not recomputed. A seed makes the run reproducible; the realization limit is lowered here to keep the page quick to build.
+`monte_carlo` repeats the characterization with the five uncertainty sources drawn per realization. The target and the band computed above are passed in so they are not recomputed. A seed makes the run reproducible; the realization limit is lowered here to keep the page quick to build.
 
 ```{python}
 mc_opts = dp.MonteCarloOptions(seed=1, chunk=50, max_realizations=200)

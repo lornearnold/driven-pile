@@ -17,7 +17,7 @@ def test_target_matches_research_within_rounding(fixture):
     np.testing.assert_allclose(target.capacity[n_top:], ref["capacity"], atol=1.5)
 
 
-def test_march_reproduces_research_on_identical_target(fixture):
+def test_characterization_reproduces_research_on_identical_target(fixture):
     log, soil = paper_inputs(fixture)
     target = dp.prepare_target(log, soil)
     research_target = target.with_capacity(

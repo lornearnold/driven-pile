@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .march import run_drive
+from .characterization import run_drive
 from .options import ModelOptions
 from .results import TopPhiBand
 

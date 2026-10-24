@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .march import run_drive
+from .characterization import run_drive
 from .options import ModelOptions, MonteCarloOptions
 from .preprocess import prepare_target, residual_scale
 from .results import MonteCarloResult

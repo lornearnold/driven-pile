@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .march import run_drive
+from .characterization import run_drive
 from .montecarlo import monte_carlo
 from .options import ModelOptions, MonteCarloOptions
 from .preprocess import prepare_target

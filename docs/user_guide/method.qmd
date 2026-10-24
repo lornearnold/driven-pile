@@ -9,7 +9,7 @@ This page maps the equations of the method to the functions that implement them.
 Each logged foot of driving is a load test of the soil at the pile toe. The method inverts the driving record in four steps:
 
 1. Convert the blow count of each foot to a capacity at the time of driving with a recalibrated dynamic formula.
-2. March down the pile. At each foot, subtract the shaft resistance of the feet above and find the friction angle whose toe bearing supplies the rest.
+2. Characterize the soil sequentially, top down. At each foot, subtract the shaft resistance of the feet above in their current state and find the friction angle whose toe bearing supplies the rest.
 3. Treat every hammer blow as a cycle of shear on the soil near the toe. Count the blows each foot feels, compare them with the number that would liquefy it, and track the pore-pressure ratio $r_u$. Soil with elevated pore pressure carries less shaft resistance during driving and less toe bearing.
 4. Sum the shaft resistance of every foot with its pore pressure dissipated and add the toe resistance at the end of the drive. That is the long-term capacity.
 
@@ -78,7 +78,7 @@ $$
 \phi = \min\!\left(45^\circ,\; 26 + 5.5 \log_{10}(N_{1,60} + 0.01) + 0.11\, N_{1,60}\right)
 $$
 
-The march needs the inverse: the $N_{1,60}$ that the characterized $\phi$ implies, which feeds the liquefaction resistance and the residual strength. `ModelOptions.dphi` shifts the line; the Monte Carlo draws it.
+The characterization needs the inverse: the $N_{1,60}$ that the characterized $\phi$ implies, which feeds the liquefaction resistance and the residual strength. `ModelOptions.dphi` shifts the line; the Monte Carlo draws it.
 
 | Quantity | Function |
 |---|---|
@@ -124,7 +124,7 @@ $$
 | $\text{CRR}_{15}$ in situ | `liquefaction.crr_15` |
 | CSR | `liquefaction.csr_driving` |
 | $N_L$ | `liquefaction.cycles_to_liquefaction` |
-| all four for one foot | `march.triggering_state` |
+| all four for one foot | `characterization.triggering_state` |
 
 ## Pore-pressure ratio
 
@@ -169,11 +169,11 @@ where $\alpha$ is the Randolph and Murphy (1985) interface factor on the undrain
 |---|---|
 | $\alpha$ | `shaft.interface_alpha` |
 | $f_s(r_u)$ | `shaft.fs_partially_liquefied` |
-| unit shaft resistance of a foot now and after dissipation | `march.fs_current`, `march.fs_unliquefied` |
+| unit shaft resistance of a foot now and after dissipation | `characterization.fs_current`, `characterization.fs_unliquefied` |
 
-## The march
+## Sequential implicit characterization
 
-`run_drive` walks the grid top down. At each logged foot it:
+`run_drive` characterizes the soil one logged foot at a time, top down. The pass is sequential: each foot is solved once, from the state the feet above have reached when the toe arrives. It is implicit: the friction angle at a foot depends on the effective stress the toe bears on, which depends on the foot's own pore-pressure ratio, which depends on the liquefaction resistance that the friction angle implies, so the pair is solved to self-consistency. And the state keeps evolving behind the toe: blows at later feet raise the pore pressure of the feet above, so the shaft resistance those feet contribute to every later step is not fixed when they are characterized. At each logged foot the pass:
 
 1. sums the shaft resistance of the feet above in their current state;
 2. divides the remainder of the target capacity by the toe area to get the required unit toe resistance;
@@ -182,7 +182,7 @@ where $\alpha$ is the Randolph and Murphy (1985) interface factor on the undrain
 
 The feet of the unlogged top segment are assigned a constant friction angle `top_phi` and take part in the blow accounting like any other foot.
 
-`sweep_top_phi` repeats the march for every `top_phi` from `phi_lo` to `phi_hi` in steps of `top_sweep_step` and records the root-mean-square misfit between the modeled and target capacities. The admissible band is the contiguous set of angles around the minimum whose misfit is within `max(top_sweep_tol_frac * rms_min, top_sweep_tol_kips)` of it. The deterministic analysis uses the lowest admissible angle.
+`sweep_top_phi` repeats the characterization for every `top_phi` from `phi_lo` to `phi_hi` in steps of `top_sweep_step` and records the root-mean-square misfit between the modeled and target capacities. The admissible band is the contiguous set of angles around the minimum whose misfit is within `max(top_sweep_tol_frac * rms_min, top_sweep_tol_kips)` of it. The deterministic analysis uses the lowest admissible angle.
 
 ## Long-term capacity
 
@@ -200,7 +200,7 @@ The shaft term uses the unliquefied resistance of every foot, that is, the resis
 
 ## Monte Carlo
 
-`monte_carlo` propagates five uncertainty sources through the march. Each realization draws:
+`monte_carlo` propagates five uncertainty sources through the characterization. Each realization draws:
 
 | Source | Distribution | Option |
 |---|---|---|

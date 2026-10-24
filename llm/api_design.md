@@ -175,7 +175,7 @@ def sweep_top_phi(target, options) -> TopPhiBand
     # constant-phi sweep over [phi_lo, phi_hi]; returns lo, hi and the RMS curve
 
 def run_drive(target, options, top_phi: float) -> DriveResult
-    # the top-down marching solve, per-foot characterization
+    # the sequential implicit characterization, per-foot solve
 
 def long_term_capacity(result) -> tuple[float, float]
     # (shaft_kips, toe_eod_kips); toe is the end-of-drive value, no toe setup
@@ -261,7 +261,7 @@ class Analysis:
 | `bearing.py` | Vesic Nq*, stress-dependent rigidity index, phi inversion | soil_capacity._Nq_vesic, qp_cohesionless, DriveParams.irr_of, drive_model._phi_fast |
 | `shaft.py` | Coyle & Castello K with Nordlund extension, partial-ru law, Randolph-Murphy alpha | drive_model.fs_coyle_castello, nordlund_kdelta, liq_interface_alpha, Sample.fs_* |
 | `liquefaction.py` | CSR, Boulanger & Idriss CRR, NL, linear ru, Kramer & Wang Sr | liquefaction.py (minus retired ru_seed) |
-| `march.py` | Sample, characterize_foot, run_drive | drive_model.run_drive and helpers |
+| `characterization.py` | Sample, characterize_foot, run_drive | drive_model.run_drive and helpers |
 | `top_segment.py` | sweep_top_phi | run_drive_model.top_phi_range |
 | `capacity.py` | long_term_capacity | drive_model.ltc_parts (eod toe only) |
 | `montecarlo.py` | monte_carlo | run_mc_ltc.run_realization (no CSV cache, no multiprocessing coupling) |

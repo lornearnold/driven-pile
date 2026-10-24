@@ -87,7 +87,7 @@ plt.show()
 `sweep_top_phi` tries a constant friction angle for the top segment and keeps the values whose fit to the log is as good as the best one. The admissible band is the range of top-segment friction angles the log cannot distinguish between.
 
 ```{python}
-#| fig-cap: Misfit of the march versus the assumed top-segment friction angle. The shaded range is the admissible band.
+#| fig-cap: Misfit of the characterization versus the assumed top-segment friction angle. The shaded range is the admissible band.
 band = dp.sweep_top_phi(target)
 
 fig, ax = plt.subplots(figsize=(5, 3.5))
@@ -99,7 +99,7 @@ ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
-`run_drive` marches down the grid, characterizing each logged foot from the toe resistance the target demands and tracking the pore pressure that later blows generate. The deterministic analysis uses the lowest admissible top-segment friction angle.
+`run_drive` characterizes each logged foot in sequence, top down, from the toe resistance the target demands, and keeps updating the pore pressure of the feet above as later blows arrive. The deterministic analysis uses the lowest admissible top-segment friction angle.
 
 ```{python}
 result = dp.run_drive(target, top_phi=band.lo)

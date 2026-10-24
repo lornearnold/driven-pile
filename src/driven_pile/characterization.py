@@ -1,5 +1,7 @@
-"""The top-down march: characterize each logged foot from the capacity
-target and track pore pressure through the rest of the drive."""
+"""Sequential implicit characterization: step down the pile one logged foot
+at a time, solve each foot's friction angle and toe pore-pressure ratio to
+self-consistency from the capacity target, and keep updating the pore
+pressure of the feet above as later blows arrive."""
 
 from __future__ import annotations
 
@@ -31,7 +33,7 @@ _RU_GRID = 25
 
 @dataclass
 class Foot:
-    """State of one foot of soil during the march."""
+    """State of one foot of soil during the characterization pass."""
 
     index: int
     elevation: float
@@ -173,7 +175,7 @@ def characterize_foot(foot, q_needed, felt_arrival, options):
 
 
 def run_drive(target, options=None, top_phi=None):
-    """March the capacity target top down and characterize every foot.
+    """Characterize every foot sequentially from the capacity target, top down.
 
     Parameters
     ----------

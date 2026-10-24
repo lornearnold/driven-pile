@@ -474,8 +474,8 @@ reference:
       - liquefaction.residual_strength
       - capacity.shaft_long_term
       - capacity.toe_end_of_drive
-      - march.triggering_state
-      - march.characterize_foot
+      - characterization.triggering_state
+      - characterization.characterize_foot
 
 # Inline Methods
 # --------------
