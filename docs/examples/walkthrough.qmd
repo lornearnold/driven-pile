@@ -14,18 +14,11 @@ mpl.rcParams.update({
 })
 ```
 
-This example steps through the method on one of the benchmark piles,
-pile B-20 of the Pier 4 data set. Each stage of `analyze`
-is run by hand so that its inputs and outputs can be inspected. The
-[method page](../user-guide/method.qmd) explains the equations behind
-each stage.
+This example steps through the method on one of the benchmark piles, pile B-20 of the Pier 4 data set. Each stage of `analyze` is run by hand so that its inputs and outputs can be inspected. The [method page](../user-guide/method.qmd) explains the equations behind each stage.
 
 ## Load the record
 
-The log is a CSV with one row per foot: toe elevation, hammer stroke and
-blows per foot. This inspector recorded the stroke in feet instead of the
-blow rate, so the `stroke` column is named; the package converts it to
-blows per minute on input.
+The log is a CSV with one row per foot: toe elevation, hammer stroke and blows per foot. This inspector recorded the stroke in feet instead of the blow rate, so the `stroke` column is named; the package converts it to blows per minute on input.
 
 ```{python}
 import numpy as np
@@ -48,9 +41,7 @@ print(f"{len(log.elevation)} logged feet, "
       f"from {log.elevation.max():.1f} to {log.elevation.min():.1f} ft")
 ```
 
-The fines content comes from a second table of elevation versus percent
-passing the No. 200 sieve. The mudline at this pile is 50 ft below datum,
-32 ft above the first logged foot.
+The fines content comes from a second table of elevation versus percent passing the No. 200 sieve. The mudline at this pile is 50 ft below datum, 32 ft above the first logged foot.
 
 ```{python}
 fines = np.loadtxt("data/B-20_fines.csv", delimiter=",", skiprows=1)
@@ -59,9 +50,7 @@ soil = dp.SoilProfile(mudline=-50.0, elevation=fines[:, 0], fines=fines[:, 1])
 
 ## Stage 1: the capacity target
 
-`prepare_target` applies the recalibrated Danish formula to each
-foot, smooths the result with a Savitzky-Golay filter, anchors the final
-foot to its unsmoothed value, and extends the grid up to the mudline.
+`prepare_target` applies the recalibrated Danish formula to each foot, smooths the result with a Savitzky-Golay filter, anchors the final foot to its unsmoothed value, and extends the grid up to the mudline.
 
 ```{python}
 target = dp.prepare_target(log, soil)
@@ -83,11 +72,7 @@ plt.show()
 
 ## Stage 2: the unlogged top segment
 
-The pile passed through 32 ft of soil before the inspector started
-logging. `sweep_top_phi` assigns a constant friction angle to that segment,
-runs the march for each value from 25 to 45 degrees, and records the
-root-mean-square misfit between the modeled and target capacities over the
-logged feet.
+The pile passed through 32 ft of soil before the inspector started logging. `sweep_top_phi` assigns a constant friction angle to that segment, runs the march for each value from 25 to 45 degrees, and records the root-mean-square misfit between the modeled and target capacities over the logged feet.
 
 ```{python}
 band = dp.sweep_top_phi(target)
@@ -105,15 +90,11 @@ ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
-The log cannot distinguish between angles inside the band. The
-deterministic analysis uses the lowest one; the Monte Carlo draws from the
-whole band.
+The log cannot distinguish between angles inside the band. The deterministic analysis uses the lowest one; the Monte Carlo draws from the whole band.
 
 ## Stage 3: the march
 
-`run_drive` characterizes each logged foot from the toe resistance the
-target demands after subtracting the shaft resistance of the feet above,
-and tracks the pore pressure that later blows generate in every foot.
+`run_drive` characterizes each logged foot from the toe resistance the target demands after subtracting the shaft resistance of the feet above, and tracks the pore pressure that later blows generate in every foot.
 
 ```{python}
 result = dp.run_drive(target, top_phi=band.lo)
@@ -150,10 +131,7 @@ np.column_stack([
 
 ## Stage 4: long-term capacity
 
-The long-term capacity is the shaft resistance of every foot after its
-pore pressure has dissipated plus the toe resistance at the end of the
-drive. `long_term_capacity` returns the two parts; `run_drive` has already
-stored them on the result.
+The long-term capacity is the shaft resistance of every foot after its pore pressure has dissipated plus the toe resistance at the end of the drive. `long_term_capacity` returns the two parts; `run_drive` has already stored them on the result.
 
 ```{python}
 shaft, toe = dp.long_term_capacity(result)
@@ -175,10 +153,7 @@ plt.show()
 
 ## Stage 5: Monte Carlo
 
-`monte_carlo` repeats the march with the five uncertainty sources drawn
-per realization. The target and the band computed above are passed in so
-they are not recomputed. A seed makes the run reproducible; the
-realization limit is lowered here to keep the page quick to build.
+`monte_carlo` repeats the march with the five uncertainty sources drawn per realization. The target and the band computed above are passed in so they are not recomputed. A seed makes the run reproducible; the realization limit is lowered here to keep the page quick to build.
 
 ```{python}
 mc_opts = dp.MonteCarloOptions(seed=1, chunk=50, max_realizations=200)
@@ -211,8 +186,7 @@ plt.show()
 
 ## The same in one call
 
-`analyze` runs stages 1 to 4, and stage 5 when asked, and returns them
-together.
+`analyze` runs stages 1 to 4, and stage 5 when asked, and returns them together.
 
 ```{python}
 out = dp.analyze(log, soil)

@@ -1,46 +1,27 @@
 # driven-pile: public API design
 
-Status: revised 2026-10-23 after review; implemented the same day in
-`src/driven_pile/`. Revised again 2026-10-23: `DriveLog` carries its `Pile`
-and `Hammer` (decision 8); `SoilProfile` replaces `Site` and `FinesProfile`
-(decision 9).
+Status: revised 2026-10-23 after review; implemented the same day in `src/driven_pile/`. Revised again 2026-10-23: `DriveLog` carries its `Pile` and `Hammer` (decision 8); `SoilProfile` replaces `Site` and `FinesProfile` (decision 9).
 
 ## 1. Scope and principles
 
-- A plain Python library. No command-line interface, no file-system
-  conventions, no module-level data loading. Everything the model needs is
-  passed in as an argument.
-- Implements exactly the method: the capacity formula, toe bearing, shaft
-  resistance, liquefaction and residual strength relations, the
-  unlogged-top-segment sweep, end-of-drive to long-term capacity, and the
-  five-source Monte Carlo. Retired exploration modes from the research repo
-  are not ported.
+- A plain Python library. No command-line interface, no file-system conventions, no module-level data loading. Everything the model needs is passed in as an argument.
+- Implements exactly the method: the capacity formula, toe bearing, shaft resistance, liquefaction and residual strength relations, the unlogged-top-segment sweep, end-of-drive to long-term capacity, and the five-source Monte Carlo. Retired exploration modes from the research repo are not ported.
 - Soil classification is out of scope. Fines content is an input.
-- Dependencies: numpy and scipy only. matplotlib is an optional extra used
-  only by the `plot_*` helpers.
-- Three layers so students can use the one-call version and researchers can
-  reach the pieces:
+- Dependencies: numpy and scipy only. matplotlib is an optional extra used only by the `plot_*` helpers.
+- Three layers so students can use the one-call version and researchers can reach the pieces:
   1. `analyze(...)` does everything.
-  2. Pipeline functions (`prepare_target`, `sweep_top_phi`, `run_drive`,
-     `long_term_capacity`, `monte_carlo`) do one stage each.
-  3. Equation-level functions (`crr_15`, `nq_vesic`, `fs_coyle_castello`,
-     ...) are importable for teaching and testing.
+  2. Pipeline functions (`prepare_target`, `sweep_top_phi`, `run_drive`, `long_term_capacity`, `monte_carlo`) do one stage each.
+  3. Equation-level functions (`crr_15`, `nq_vesic`, `fs_coyle_castello`, ...) are importable for teaching and testing.
 
 ## 2. Units
 
-US customary throughout, matching the construction records:
-feet, kips, kips per square foot (ksf), degrees. The Danish formula inputs
-(ram weight, pile modulus, area) are therefore kips, ksf, and square feet.
-SI conversion helpers are deferred to a later release.
+US customary throughout, matching the construction records: feet, kips, kips per square foot (ksf), degrees. The Danish formula inputs (ram weight, pile modulus, area) are therefore kips, ksf, and square feet. SI conversion helpers are deferred to a later release.
 
 ## 3. Inputs
 
 ### 3.1 `DriveLog`
 
-The driving record as the inspector wrote it: one row per foot with blows
-per minute (hammer speed, from which stroke is derived) and blows per foot.
-Mirrors the research repo's `PileLog`, less the site-specific fields
-(coordinates, schedule length, precomputed capacity).
+The driving record as the inspector wrote it: one row per foot with blows per minute (hammer speed, from which stroke is derived) and blows per foot. Mirrors the research repo's `PileLog`, less the site-specific fields (coordinates, schedule length, precomputed capacity).
 
 ```python
 @dataclass
@@ -69,30 +50,13 @@ class DriveLog:
                  forward_fill=False, pile_id=None) -> "DriveLog"
 ```
 
-A log cannot exist without the pile and hammer that produced it, so both are
-required to construct one. `Pile` and `Hammer` stay separate classes because
-one hammer, and often one section, is shared across a project's logs.
+A log cannot exist without the pile and hammer that produced it, so both are required to construct one. `Pile` and `Hammer` stay separate classes because one hammer, and often one section, is shared across a project's logs.
 
-- Elevation is either given directly or built from `depth` and
-  `tip_elevation` as `tip_elevation + depth[-1] - depth`, the same rule the
-  research reader uses. Exactly one of the two forms is required.
-- `from_csv` takes column names (or zero-based indices) for the bpm, bpf,
-  and depth or elevation columns and a `skiprows` count, so the Pier 4
-  digitized logs load with `from_csv(path, pile_id=..., depth=0, bpm=1,
-  bpf=2, tip_elevation=..., skiprows=4)`. There is no site-specific reader.
-- Non-numeric cells become NaN and the log is trimmed to the first and last
-  rows where bpm and bpf are both numeric. `valid` marks finite rows inside
-  that span. `forward_fill` carries the last recorded rate over unrecorded
-  feet inside the span.
-- The log stores bpm and bpf; `stroke` is a derived property. A log whose
-  inspector recorded the stroke in feet instead of the blow rate (10 of the
-  15 Pier 4 benchmark logs) is loaded with `stroke=` and converted to bpm on
-  input with `stroke_to_bpm`, the exact inverse of `bpm_to_stroke`. The
-  caller says which it is; the package does not guess from magnitude the
-  way the research reader does.
-- `bpm_to_stroke(bpm)` and `stroke_to_bpm(stroke)` are public functions
-  (free-fall stroke from the time between blows for an open-ended diesel
-  hammer, and its inverse).
+- Elevation is either given directly or built from `depth` and `tip_elevation` as `tip_elevation + depth[-1] - depth`, the same rule the research reader uses. Exactly one of the two forms is required.
+- `from_csv` takes column names (or zero-based indices) for the bpm, bpf, and depth or elevation columns and a `skiprows` count, so the Pier 4 digitized logs load with `from_csv(path, pile_id=..., depth=0, bpm=1, bpf=2, tip_elevation=..., skiprows=4)`. There is no site-specific reader.
+- Non-numeric cells become NaN and the log is trimmed to the first and last rows where bpm and bpf are both numeric. `valid` marks finite rows inside that span. `forward_fill` carries the last recorded rate over unrecorded feet inside the span.
+- The log stores bpm and bpf; `stroke` is a derived property. A log whose inspector recorded the stroke in feet instead of the blow rate (10 of the 15 Pier 4 benchmark logs) is loaded with `stroke=` and converted to bpm on input with `stroke_to_bpm`, the exact inverse of `bpm_to_stroke`. The caller says which it is; the package does not guess from magnitude the way the research reader does.
+- `bpm_to_stroke(bpm)` and `stroke_to_bpm(stroke)` are public functions (free-fall stroke from the time between blows for an open-ended diesel hammer, and its inverse).
 
 ### 3.2 `Pile`
 
@@ -113,8 +77,7 @@ class Pile:
     def round(cls, diameter_in, length_ft, modulus_ksf=...) -> "Pile"
 ```
 
-The benchmark pile: `Pile.octagonal(24, 150)` gives area 3.3125 ft^2,
-perimeter 6.627 ft, width 2.0 ft.
+The benchmark pile: `Pile.octagonal(24, 150)` gives area 3.3125 ft^2, perimeter 6.627 ft, width 2.0 ft.
 
 ### 3.3 `Hammer`
 
@@ -124,9 +87,7 @@ class Hammer:
     ram_weight: float          # kips, W in the Danish formula
 ```
 
-Stroke comes from the log. The regional recalibration coefficients of the Danish formula
-are a property of the capacity formula, not the hammer, and live in
-`ModelOptions`.
+Stroke comes from the log. The regional recalibration coefficients of the Danish formula are a property of the capacity formula, not the hammer, and live in `ModelOptions`.
 
 ### 3.4 `SoilProfile`
 
@@ -141,9 +102,7 @@ class SoilProfile:
     def fines_at(self, elevation) -> np.ndarray   # linear interpolation, end values held
 ```
 
-One object per pile location: the mudline and the fines profile vary from
-pile to pile. To reproduce the benchmark piles, the per-foot fines content the
-classifier produced is passed as the `elevation`, `fines` table.
+One object per pile location: the mudline and the fines profile vary from pile to pile. To reproduce the benchmark piles, the per-foot fines content the classifier produced is passed as the `elevation`, `fines` table.
 
 ### 3.5 `ModelOptions`
 
@@ -186,11 +145,7 @@ class ModelOptions:
     ru_tol: float = 1e-4
 ```
 
-Fixed by the method, not options: 1-ft increments, linear ru growth,
-15-cycle CRR reference, Vesic bearing factor, `max(...)` shaft law,
-Randolph-Murphy interface alpha, no toe setup, the reason codes
-for feet that cannot be reconciled, and the top-segment point estimate at the
-lowest admissible phi.
+Fixed by the method, not options: 1-ft increments, linear ru growth, 15-cycle CRR reference, Vesic bearing factor, `max(...)` shaft law, Randolph-Murphy interface alpha, no toe setup, the reason codes for feet that cannot be reconciled, and the top-segment point estimate at the lowest admissible phi.
 
 ### 3.6 `MonteCarloOptions`
 
@@ -230,16 +185,11 @@ def monte_carlo(log, soil, options, mc_options) -> MonteCarloResult
 def analyze(log, soil, options=None, mc_options=None, run_mc=False) -> Analysis
 ```
 
-`Target` is a public dataclass (pile, elevation, capacity, bpf, fines,
-sigma_v0, mudline, n_top) so a user can inspect or replace the capacity
-target. It carries the pile and the soil state forward, so `sweep_top_phi`
-and `run_drive` take only the target and the options. The
-deterministic `analyze` uses the lowest admissible top-segment phi.
+`Target` is a public dataclass (pile, elevation, capacity, bpf, fines, sigma_v0, mudline, n_top) so a user can inspect or replace the capacity target. It carries the pile and the soil state forward, so `sweep_top_phi` and `run_drive` take only the target and the options. The deterministic `analyze` uses the lowest admissible top-segment phi.
 
 ## 5. Results
 
-Plain dataclasses holding numpy arrays, one entry per foot of the analysis
-grid (unlogged top segment included). No table wrapper and no pandas.
+Plain dataclasses holding numpy arrays, one entry per foot of the analysis grid (unlogged top segment included). No table wrapper and no pandas.
 
 ```python
 @dataclass
@@ -318,53 +268,27 @@ class Analysis:
 | `results.py` | DriveResult, MonteCarloResult, TopPhiBand, Analysis | DriveResult.report, result CSV writers |
 | `plots.py` | optional matplotlib helpers | figures/drive_model_profiles.py, mc_uncertainty.py (simplified) |
 
-Not ported: bayes_classify, soil_inversion (superseded by drive_model),
-pile_schedule, mudline interpolation, setup.csv truth, benchmark metrics,
-Janbu / Gates / WSDOT formulas, and the DriveParams modes `blend`, `const`
-alpha, `density` rigidity, `hybrid` and `beta2` shafts, `fs_lim_mode`,
-`K_phi_slope`, `z_c`, `cc_k_mult`, `dphi_fc`, `irr_sigma='static'`,
-`ru_model='seed'`, `fp_seed` variants other than `low`, and the unliquefied-toe
-LTC variant.
+Not ported: bayes_classify, soil_inversion (superseded by drive_model), pile_schedule, mudline interpolation, setup.csv truth, benchmark metrics, Janbu / Gates / WSDOT formulas, and the DriveParams modes `blend`, `const` alpha, `density` rigidity, `hybrid` and `beta2` shafts, `fs_lim_mode`, `K_phi_slope`, `z_c`, `cc_k_mult`, `dphi_fc`, `irr_sigma='static'`, `ru_model='seed'`, `fp_seed` variants other than `low`, and the unliquefied-toe LTC variant.
 
 ## 7. Code conventions
 
-- Docstrings follow the numpy convention (Parameters, Returns, Notes,
-  References sections). Each equation-level function cites its original
-  published source in References, never Arnold (2027) or its equation
-  numbers.
-- PEP 8 and standard Python practice: type hints on public signatures,
-  dataclasses for records, no module-level state, no bare `except`.
-- Comments describe what the code does. Design rationale, history, and
-  alternatives considered belong in docs/, not in source files.
-- Tests use pytest. Each equation gets a hand-calculated anchor test; each
-  benchmark pile gets a regression test against the frozen outputs.
+- Docstrings follow the numpy convention (Parameters, Returns, Notes, References sections). Each equation-level function cites its original published source in References, never Arnold (2027) or its equation numbers.
+- PEP 8 and standard Python practice: type hints on public signatures, dataclasses for records, no module-level state, no bare `except`.
+- Comments describe what the code does. Design rationale, history, and alternatives considered belong in docs/, not in source files.
+- Tests use pytest. Each equation gets a hand-calculated anchor test; each benchmark pile gets a regression test against the frozen outputs.
 
 ## 8. Reproducing the benchmark results
 
-A test fixture per benchmark pile holds the Pier 4 log, mudline, per-foot
-fines, and the frozen outputs (tagged `paper-freeze-2026-10-23` in the
-research repo). Because the research code's point estimate used an
-ill-defined argmin over a flat RMS band, the regression test compares the
-package's lowest-admissible-phi result against a re-derived reference at that
-same phi, and checks the admissible band itself against the frozen one.
+A test fixture per benchmark pile holds the Pier 4 log, mudline, per-foot fines, and the frozen outputs (tagged `paper-freeze-2026-10-23` in the research repo). Because the research code's point estimate used an ill-defined argmin over a flat RMS band, the regression test compares the package's lowest-admissible-phi result against a re-derived reference at that same phi, and checks the admissible band itself against the frozen one.
 
 ## 9. Decisions recorded (review of 2026-10-23)
 
 1. US customary units only in v0.1.
 2. Fines content is an (elevation, fines) table or a single uniform value.
-3. `Hammer` carries only ram weight. The Danish formula recalibration coefficients
-   are in `ModelOptions`.
-4. `DriveLog` mirrors `PileLog`: elevation, bpm, bpf, with stroke derived.
-   No site-specific reader.
+3. `Hammer` carries only ram weight. The Danish formula recalibration coefficients are in `ModelOptions`.
+4. `DriveLog` mirrors `PileLog`: elevation, bpm, bpf, with stroke derived. No site-specific reader.
 5. Monte Carlo is off by default in `analyze`.
 6. Results are dataclasses of plain numpy arrays; no table wrapper, no pandas.
 7. The deterministic top-segment phi is the lowest admissible value.
-8. `DriveLog` requires a `Pile` and a `Hammer` (Lorne, 2026-10-23): a log
-   cannot exist without them. `Target` carries the pile, so every pipeline
-   function after the log takes only `(log or target, soil, options)`.
-9. `Site` and `FinesProfile` are replaced by one `SoilProfile` (Lorne,
-   2026-10-23): "Site" suggested a shared object when the mudline and fines
-   vary per pile, and a separate class for one interpolated column was more
-   structure than the concept needed. The mudline stays with the soil
-   profile. `run_drive` and `sweep_top_phi` drop the soil argument, which
-   they never read.
+8. `DriveLog` requires a `Pile` and a `Hammer` (Lorne, 2026-10-23): a log cannot exist without them. `Target` carries the pile, so every pipeline function after the log takes only `(log or target, soil, options)`.
+9. `Site` and `FinesProfile` are replaced by one `SoilProfile` (Lorne, 2026-10-23): "Site" suggested a shared object when the mudline and fines vary per pile, and a separate class for one interpolated column was more structure than the concept needed. The mudline stays with the soil profile. `run_drive` and `sweep_top_phi` drop the soil argument, which they never read.

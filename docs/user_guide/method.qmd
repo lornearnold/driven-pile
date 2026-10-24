@@ -2,46 +2,29 @@
 title: The method
 ---
 
-This page maps the equations of the method to the functions that implement
-them. The equation-level functions live in the submodules named
-below and are importable for teaching and testing; the pipeline functions
-`prepare_target`, `sweep_top_phi`, `run_drive`, `long_term_capacity` and
-`monte_carlo` chain them together, and `analyze` runs the whole chain.
+This page maps the equations of the method to the functions that implement them. The equation-level functions live in the submodules named below and are importable for teaching and testing; the pipeline functions `prepare_target`, `sweep_top_phi`, `run_drive`, `long_term_capacity` and `monte_carlo` chain them together, and `analyze` runs the whole chain.
 
 ## Overview
 
-Each logged foot of driving is a load test of the soil at the pile toe. The
-method inverts the driving record in four steps:
+Each logged foot of driving is a load test of the soil at the pile toe. The method inverts the driving record in four steps:
 
-1. Convert the blow count of each foot to a capacity at the time of driving
-   with a recalibrated dynamic formula.
-2. March down the pile. At each foot, subtract the shaft resistance of the
-   feet above and find the friction angle whose toe bearing
-   supplies the rest.
-3. Treat every hammer blow as a cycle of shear on the soil near the toe.
-   Count the blows each foot feels, compare them with the number that
-   would liquefy it, and track the pore-pressure ratio
-   $r_u$. Soil with elevated pore pressure carries less shaft
-   resistance during driving and less toe bearing.
-4. Sum the shaft resistance of every foot with its pore pressure dissipated
-   and add the toe resistance at the end of the drive. That is the
-   long-term capacity.
+1. Convert the blow count of each foot to a capacity at the time of driving with a recalibrated dynamic formula.
+2. March down the pile. At each foot, subtract the shaft resistance of the feet above and find the friction angle whose toe bearing supplies the rest.
+3. Treat every hammer blow as a cycle of shear on the soil near the toe. Count the blows each foot feels, compare them with the number that would liquefy it, and track the pore-pressure ratio $r_u$. Soil with elevated pore pressure carries less shaft resistance during driving and less toe bearing.
+4. Sum the shaft resistance of every foot with its pore pressure dissipated and add the toe resistance at the end of the drive. That is the long-term capacity.
 
 Stresses are in ksf, lengths in ft, forces in kips and angles in degrees.
 
 ## Capacity at the time of driving
 
-The recalibrated Danish formula converts the set per blow $s = 1/\text{bpf}$
-and the stroke $h$ into a capacity:
+The recalibrated Danish formula converts the set per blow $s = 1/\text{bpf}$ and the stroke $h$ into a capacity:
 
 $$
 Q = c_1 \frac{W h}{s + s_0} + c_2, \qquad
 s_0 = \sqrt{\frac{W h L}{2 A E}}
 $$
 
-with ram weight $W$, pile length $L$, section area $A$ and modulus $E$.
-The Puget Sound recalibration of Reddy and Stuedlein (2013) gives
-$c_1 = 0.45$ and $c_2 = 0$.
+with ram weight $W$, pile length $L$, section area $A$ and modulus $E$. The Puget Sound recalibration of Reddy and Stuedlein (2013) gives $c_1 = 0.45$ and $c_2 = 0$.
 
 | Quantity | Function |
 |---|---|
@@ -53,15 +36,11 @@ $c_1 = 0.45$ and $c_2 = 0$.
 | static vertical effective stress $\sigma'_{v0}$ | `preprocess.sigma_v0_profile` |
 | all of the above | `prepare_target` |
 
-`prepare_target` returns a `Target`: the smoothed capacity, blow count,
-fines content and $\sigma'_{v0}$ of every foot on a one-foot grid from the
-mudline to the toe. The feet above the first logged foot are the unlogged
-top segment; their capacity is NaN.
+`prepare_target` returns a `Target`: the smoothed capacity, blow count, fines content and $\sigma'_{v0}$ of every foot on a one-foot grid from the mudline to the toe. The feet above the first logged foot are the unlogged top segment; their capacity is NaN.
 
 ## Toe bearing
 
-The unit toe resistance is $q_p = N_q^* \sigma'_v$ with the Vesic (1977)
-cavity-expansion bearing factor
+The unit toe resistance is $q_p = N_q^* \sigma'_v$ with the Vesic (1977) cavity-expansion bearing factor
 
 $$
 N_q^* = \frac{1 + 2K_0}{3}\,
@@ -71,9 +50,7 @@ e^{(\pi/2 - \phi)\tan\phi}\,
 I_{rr}^{\,4\sin\phi / 3(1 + \sin\phi)}
 $$
 
-and $K_0 = 1 - \sin\phi$. The rigidity index comes from a stress-dependent
-small-strain shear modulus (Seed and Idriss, 1970) reduced to the strain
-level of bearing failure:
+and $K_0 = 1 - \sin\phi$. The rigidity index comes from a stress-dependent small-strain shear modulus (Seed and Idriss, 1970) reduced to the strain level of bearing failure:
 
 $$
 I_r = \frac{(G/G_{max})\, G_{max}}{\sigma'_m \tan\phi}, \qquad
@@ -81,8 +58,7 @@ G_{max} = 21.7\, K_2\, p_a \sqrt{\sigma'_m / p_a}, \qquad
 \sigma'_m = \frac{1 + 2K_0}{3}\sigma'_v
 $$
 
-$K_2$ is interpolated between its values at the friction-angle bounds and
-$I_r$ is clamped to `irr_bounds`.
+$K_2$ is interpolated between its values at the friction-angle bounds and $I_r$ is clamped to `irr_bounds`.
 
 | Quantity | Function |
 |---|---|
@@ -92,24 +68,17 @@ $I_r$ is clamped to `irr_bounds`.
 | $\phi$ from a required $q_p$ (root find) | `bearing.phi_from_toe_bearing` |
 | the same by interpolation on a grid | `bearing.phi_from_toe_bearing_grid` |
 
-The inversion returns a reason code: `ok` when a friction angle inside
-`[phi_lo, phi_hi]` reproduces the required bearing, `below_floor` or
-`above_ceiling` when the requirement lies outside the attainable range and
-the angle is held at the bound, and `nonfinite` when the target is NaN.
+The inversion returns a reason code: `ok` when a friction angle inside `[phi_lo, phi_hi]` reproduces the required bearing, `below_floor` or `above_ceiling` when the requirement lies outside the attainable range and the angle is held at the bound, and `nonfinite` when the target is NaN.
 
 ## Friction angle and blow count
 
-The friction angle is tied to the overburden-corrected blow count
-$N_{1,60}$ through the band midpoints of the WSDOT Geotechnical Design
-Manual (2022):
+The friction angle is tied to the overburden-corrected blow count $N_{1,60}$ through the band midpoints of the WSDOT Geotechnical Design Manual (2022):
 
 $$
 \phi = \min\!\left(45^\circ,\; 26 + 5.5 \log_{10}(N_{1,60} + 0.01) + 0.11\, N_{1,60}\right)
 $$
 
-The march needs the inverse: the $N_{1,60}$ that the characterized
-$\phi$ implies, which feeds the liquefaction resistance and the residual
-strength. `ModelOptions.dphi` shifts the line; the Monte Carlo draws it.
+The march needs the inverse: the $N_{1,60}$ that the characterized $\phi$ implies, which feeds the liquefaction resistance and the residual strength. `ModelOptions.dphi` shifts the line; the Monte Carlo draws it.
 
 | Quantity | Function |
 |---|---|
@@ -118,17 +87,13 @@ strength. `ModelOptions.dphi` shifts the line; the Monte Carlo draws it.
 
 ## Unliquefied shaft resistance
 
-Coyle and Castello (1981) give the unit shaft resistance of a driven pile
-in sand as
+Coyle and Castello (1981) give the unit shaft resistance of a driven pile in sand as
 
 $$
 f_s = \sigma'_{v0}\, K_t(\phi)\, 10^{-0.017\, z / B} \tan\delta
 $$
 
-with depth $z$, pile width $B$ and interface friction angle
-$\delta = $ `cc_delta_ratio` $\times\,\phi$. $K_t$ is tabulated at 30, 33
-and 36 degrees and extended above 36 degrees in proportion to the Nordlund
-coefficient at the pile's displaced volume.
+with depth $z$, pile width $B$ and interface friction angle $\delta = $ `cc_delta_ratio` $\times\,\phi$. $K_t$ is tabulated at 30, 33 and 36 degrees and extended above 36 degrees in proportion to the Nordlund coefficient at the pile's displaced volume.
 
 | Quantity | Function |
 |---|---|
@@ -144,11 +109,7 @@ $$
 \text{CSR} = \frac{\tau_{max}}{\sigma'_{v0}} = (1 - \sin\phi)\tan\phi
 $$
 
-The cyclic resistance ratio at the 15-cycle reference is the Boulanger and
-Idriss (2014) curve for the clean-sand equivalent blow count
-$N_{1,60cs} = N_{1,60} + \Delta N(FC)$, with the overburden factor
-$K_\sigma$. The number of uniform cycles that triggers liquefaction follows
-the cyclic strength curve of Idriss and Boulanger (2008):
+The cyclic resistance ratio at the 15-cycle reference is the Boulanger and Idriss (2014) curve for the clean-sand equivalent blow count $N_{1,60cs} = N_{1,60} + \Delta N(FC)$, with the overburden factor $K_\sigma$. The number of uniform cycles that triggers liquefaction follows the cyclic strength curve of Idriss and Boulanger (2008):
 
 $$
 N_L = 15 \left(\frac{\text{CRR}_{15}}{\text{CSR}}\right)^{1/b}, \qquad b = 0.34
@@ -167,16 +128,13 @@ $$
 
 ## Pore-pressure ratio
 
-The pore-pressure ratio of a foot grows linearly with the blows it has
-felt:
+The pore-pressure ratio of a foot grows linearly with the blows it has felt:
 
 $$
 r_u = \min\!\left(\frac{N_{felt}}{N_L},\; 1\right)
 $$
 
-A foot starts feeling blows when the toe is within `zone_factor` $\times B$
-above it, and keeps feeling them until it liquefies or the drive ends. A
-liquefied foot no longer transmits blows to the feet above it.
+A foot starts feeling blows when the toe is within `zone_factor` $\times B$ above it, and keeps feeling them until it liquefies or the drive ends. A liquefied foot no longer transmits blows to the feet above it.
 
 | Quantity | Function |
 |---|---|
@@ -199,16 +157,13 @@ with $N_{1,60}$ capped at 15, the limit of the calibration.
 
 ## Shaft resistance through partially liquefied soil
 
-Between the unliquefied and liquefied states the unit shaft resistance is
-the larger of the reduced frictional resistance and the mobilized residual
-strength (Boulanger and Brandenberg, 2004):
+Between the unliquefied and liquefied states the unit shaft resistance is the larger of the reduced frictional resistance and the mobilized residual strength (Boulanger and Brandenberg, 2004):
 
 $$
 f_s(r_u) = \max\!\big((1 - r_u)\, f_s,\; r_u\, \alpha\, S_r\big)
 $$
 
-where $\alpha$ is the Randolph and Murphy (1985) interface factor on the
-undrained strength ratio $S_r / \sigma'_{v0}$.
+where $\alpha$ is the Randolph and Murphy (1985) interface factor on the undrained strength ratio $S_r / \sigma'_{v0}$.
 
 | Quantity | Function |
 |---|---|
@@ -221,26 +176,13 @@ undrained strength ratio $S_r / \sigma'_{v0}$.
 `run_drive` walks the grid top down. At each logged foot it:
 
 1. sums the shaft resistance of the feet above in their current state;
-2. divides the remainder of the target capacity by the toe area to get the
-   required unit toe resistance;
-3. finds the friction angle that supplies it, together with the
-   self-consistent pore-pressure ratio at the toe: the blows the foot has
-   felt by the time the toe leaves it reduce the stress the toe
-   bears on, which changes the friction angle, which changes $N_L$. The
-   lowest root in `[0, ru_cap_toe]` is taken;
-4. adds the foot's blows to every unliquefied foot within the felt zone and
-   updates their $r_u$, marking the ones that reach $N_L$ as
-   liquefied.
+2. divides the remainder of the target capacity by the toe area to get the required unit toe resistance;
+3. finds the friction angle that supplies it, together with the self-consistent pore-pressure ratio at the toe: the blows the foot has felt by the time the toe leaves it reduce the stress the toe bears on, which changes the friction angle, which changes $N_L$. The lowest root in `[0, ru_cap_toe]` is taken;
+4. adds the foot's blows to every unliquefied foot within the felt zone and updates their $r_u$, marking the ones that reach $N_L$ as liquefied.
 
-The feet of the unlogged top segment are assigned a constant friction angle
-`top_phi` and take part in the blow accounting like any other foot.
+The feet of the unlogged top segment are assigned a constant friction angle `top_phi` and take part in the blow accounting like any other foot.
 
-`sweep_top_phi` repeats the march for every `top_phi` from `phi_lo` to
-`phi_hi` in steps of `top_sweep_step` and records the root-mean-square
-misfit between the modeled and target capacities. The admissible band is
-the contiguous set of angles around the minimum whose misfit is within
-`max(top_sweep_tol_frac * rms_min, top_sweep_tol_kips)` of it. The
-deterministic analysis uses the lowest admissible angle.
+`sweep_top_phi` repeats the march for every `top_phi` from `phi_lo` to `phi_hi` in steps of `top_sweep_step` and records the root-mean-square misfit between the modeled and target capacities. The admissible band is the contiguous set of angles around the minimum whose misfit is within `max(top_sweep_tol_frac * rms_min, top_sweep_tol_kips)` of it. The deterministic analysis uses the lowest admissible angle.
 
 ## Long-term capacity
 
@@ -248,12 +190,7 @@ $$
 Q_{LT} = P \sum_{\text{feet}} f_s^{\,unliq} \,\Delta z \;+\; A\, q_p^{\,EOD}
 $$
 
-The shaft term uses the unliquefied resistance of every foot, that
-is, the resistance after all excess pore pressure has dissipated. The toe
-term is the end-of-drive bearing of the final foot, on the stress reduced by
-its toe pore-pressure ratio, less the residual between the modeled and
-target capacities at that foot so that the end-of-drive total matches the
-log. No toe setup is modeled.
+The shaft term uses the unliquefied resistance of every foot, that is, the resistance after all excess pore pressure has dissipated. The toe term is the end-of-drive bearing of the final foot, on the stress reduced by its toe pore-pressure ratio, less the residual between the modeled and target capacities at that foot so that the end-of-drive total matches the log. No toe setup is modeled.
 
 | Quantity | Function |
 |---|---|
@@ -263,8 +200,7 @@ log. No toe setup is modeled.
 
 ## Monte Carlo
 
-`monte_carlo` propagates five uncertainty sources through the march. Each
-realization draws:
+`monte_carlo` propagates five uncertainty sources through the march. Each realization draws:
 
 | Source | Distribution | Option |
 |---|---|---|
@@ -274,34 +210,19 @@ realization draws:
 | multiplier on the cyclic resistance ratio | lognormal, median 1 | `crr_sigma_ln` |
 | top-segment friction angle | uniform over the admissible band | from `sweep_top_phi` |
 
-Realizations are added in chunks until the 95 percent confidence half-width
-of the mean long-term capacity falls below `ci_target` of the mean, or
-`max_realizations` is reached. The result holds the per-realization
-capacities and draws and the per-foot friction angle percentiles.
+Realizations are added in chunks until the 95 percent confidence half-width of the mean long-term capacity falls below `ci_target` of the mean, or `max_realizations` is reached. The result holds the per-realization capacities and draws and the per-foot friction angle percentiles.
 
 ## References
 
-- Boulanger, R. W. and Brandenberg, S. J. (2004). Neutral plane solution for
-  liquefaction-induced down-drag on vertical piles. GeoTrans 2004.
-- Boulanger, R. W. and Idriss, I. M. (2014). CPT and SPT based liquefaction
-  triggering procedures. Report UCD/CGM-14/01.
-- Coyle, H. M. and Castello, R. R. (1981). New design correlations for piles
-  in sand. Journal of the Geotechnical Engineering Division, 107(7).
-- Hannigan, P. J. et al. (2016). Design and construction of driven pile
-  foundations. FHWA GEC-12.
-- Idriss, I. M. and Boulanger, R. W. (2008). Soil liquefaction during
-  earthquakes. EERI MNO-12.
-- Kramer, S. L. and Wang, C.-H. (2015). Empirical model for estimation of
-  the residual strength of liquefied soil. Journal of Geotechnical and
-  Geoenvironmental Engineering, 141(9).
-- Randolph, M. F. and Murphy, B. S. (1985). Shaft capacity of driven piles
-  in clay. Offshore Technology Conference.
-- Reddy, S. C. and Stuedlein, A. W. (2013). Accuracy and reliability-based
-  region-specific recalibration of dynamic pile formulas. Georisk, 7(3).
-- Seed, H. B. and Idriss, I. M. (1970). Soil moduli and damping factors for
-  dynamic response analyses. Report EERC 70-10.
-- Sorensen, T. and Hansen, B. (1957). Pile driving formulae: an
-  investigation based on dimensional considerations and a statistical
-  analysis. 4th ICSMFE.
+- Boulanger, R. W. and Brandenberg, S. J. (2004). Neutral plane solution for liquefaction-induced down-drag on vertical piles. GeoTrans 2004.
+- Boulanger, R. W. and Idriss, I. M. (2014). CPT and SPT based liquefaction triggering procedures. Report UCD/CGM-14/01.
+- Coyle, H. M. and Castello, R. R. (1981). New design correlations for piles in sand. Journal of the Geotechnical Engineering Division, 107(7).
+- Hannigan, P. J. et al. (2016). Design and construction of driven pile foundations. FHWA GEC-12.
+- Idriss, I. M. and Boulanger, R. W. (2008). Soil liquefaction during earthquakes. EERI MNO-12.
+- Kramer, S. L. and Wang, C.-H. (2015). Empirical model for estimation of the residual strength of liquefied soil. Journal of Geotechnical and Geoenvironmental Engineering, 141(9).
+- Randolph, M. F. and Murphy, B. S. (1985). Shaft capacity of driven piles in clay. Offshore Technology Conference.
+- Reddy, S. C. and Stuedlein, A. W. (2013). Accuracy and reliability-based region-specific recalibration of dynamic pile formulas. Georisk, 7(3).
+- Seed, H. B. and Idriss, I. M. (1970). Soil moduli and damping factors for dynamic response analyses. Report EERC 70-10.
+- Sorensen, T. and Hansen, B. (1957). Pile driving formulae: an investigation based on dimensional considerations and a statistical analysis. 4th ICSMFE.
 - Vesic, A. S. (1977). Design of pile foundations. NCHRP Synthesis 42.
 - WSDOT (2022). Geotechnical Design Manual M 46-03.

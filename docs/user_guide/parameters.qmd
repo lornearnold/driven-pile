@@ -2,9 +2,7 @@
 title: Parameters
 ---
 
-Every parameter of the method is a field of `ModelOptions` or
-`MonteCarloOptions`. Pass a
-modified copy to any pipeline function:
+Every parameter of the method is a field of `ModelOptions` or `MonteCarloOptions`. Pass a modified copy to any pipeline function:
 
 ```python
 from dataclasses import replace
@@ -12,8 +10,7 @@ opts = replace(dp.ModelOptions(), smoothing_window=9)
 out = dp.analyze(log, soil, options=opts)
 ```
 
-Both option classes are frozen dataclasses, so a modified copy is the only
-way to change a value.
+Both option classes are frozen dataclasses, so a modified copy is the only way to change a value.
 
 ## `ModelOptions`
 
@@ -45,10 +42,7 @@ way to change a value.
 ::: {.callout-note}
 ## Interface friction angle
 
-The default interface friction angle is 0.8 times the soil friction angle,
-the ratio Coyle and Castello (1981) used with their earth pressure
-coefficients. Set `cc_delta_ratio=1.0` to take the interface friction angle
-equal to the soil friction angle.
+The default interface friction angle is 0.8 times the soil friction angle, the ratio Coyle and Castello (1981) used with their earth pressure coefficients. Set `cc_delta_ratio=1.0` to take the interface friction angle equal to the soil friction angle.
 :::
 
 ## `MonteCarloOptions`
@@ -75,6 +69,4 @@ equal to the soil friction angle.
 | `Pile.modulus` | 864,000 ksf | elastic modulus of the pile material (the default is prestressed concrete) |
 | `Hammer.ram_weight` | required | ram weight in kips, $W$ in the Danish formula |
 
-Physical constants, in `driven_pile.constants`: unit weight of water
-0.0624 ksf/ft, atmospheric pressure 2.116 ksf, gravitational acceleration
-32.2 ft/s², and the one-foot analysis increment.
+Physical constants, in `driven_pile.constants`: unit weight of water 0.0624 ksf/ft, atmospheric pressure 2.116 ksf, gravitational acceleration 32.2 ft/s², and the one-foot analysis increment.

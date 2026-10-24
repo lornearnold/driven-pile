@@ -2,15 +2,13 @@
 title: Installation
 ---
 
-`driven-pile` is a pure-Python package that depends on NumPy and SciPy.
-It supports Python 3.11 and later.
+`driven-pile` is a pure-Python package that depends on NumPy and SciPy. It supports Python 3.11 and later.
 
 ```bash
 pip install driven-pile
 ```
 
-The plot helpers on the result objects use matplotlib, which is an optional
-extra:
+The plot helpers on the result objects use matplotlib, which is an optional extra:
 
 ```bash
 pip install "driven-pile[plot]"
@@ -27,6 +25,4 @@ uv run pytest -q -m "not slow"
 
 ## Units
 
-Inputs and outputs are in US customary units throughout: feet, kips, kips
-per square foot (ksf) and degrees. The method was developed on construction
-records written in those units.
+Inputs and outputs are in US customary units throughout: feet, kips, kips per square foot (ksf) and degrees. The method was developed on construction records written in those units.
