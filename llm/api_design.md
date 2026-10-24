@@ -209,6 +209,7 @@ class DriveResult:
     fs_ltc: np.ndarray
     reason: np.ndarray          # str codes: ok, above_ceiling, below_floor, nonfinite, top_segment
     target: np.ndarray          # smoothed capacity target per foot
+    raw_capacity: np.ndarray    # per-foot formula capacity before smoothing, NaN on the top segment
     predicted: np.ndarray       # modeled at-time-of-driving capacity per foot
     top_phi: float
     options: ModelOptions

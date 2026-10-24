@@ -278,6 +278,7 @@ def run_drive(target, options=None, top_phi=None):
         fs_eod=fs_eod,
         fs_ltc=fs_ltc,
         target=target.capacity.copy(),
+        raw_capacity=target.raw_capacity.copy(),
         predicted=predicted,
         top_phi=float(top_phi) if n_top > 0 else float("nan"),
         n_top=n_top,

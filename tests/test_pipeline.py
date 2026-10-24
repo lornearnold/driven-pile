@@ -33,6 +33,15 @@ def test_long_term_capacity_matches_result_fields(inputs):
     assert toe == pytest.approx(res.toe_eod)
 
 
+def test_result_carries_target_capacities(inputs):
+    fx, log, soil = inputs
+    target = dp.prepare_target(log, soil)
+    res = dp.run_drive(target, top_phi=fx["band"]["lo"])
+    np.testing.assert_array_equal(res.target, target.capacity)
+    np.testing.assert_array_equal(res.raw_capacity, target.raw_capacity)
+    assert np.all(np.isnan(res.raw_capacity[: res.n_top]))
+
+
 def test_monte_carlo_is_seeded_and_shaped(inputs):
     fx, log, soil = inputs
     target = dp.prepare_target(log, soil)

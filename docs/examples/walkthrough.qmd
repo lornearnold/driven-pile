@@ -14,7 +14,7 @@ mpl.rcParams.update({
 })
 ```
 
-This example steps through the method on one of the benchmark piles, pile B-20 of the Pier 4 data set. Each stage of `analyze` is run by hand so that its inputs and outputs can be inspected. The [method page](../user-guide/method.qmd) explains the equations behind each stage.
+This example steps through the method on one of the benchmark piles, pile B-20 of the Pier 4 data set. The one-call `analyze` builds a capacity target, repeats a sequential characterization pass over a range of friction angles to bound the unlogged top segment, runs the pass once more at the lowest admissible angle, reads the long-term capacity off that result, and optionally repeats the pass again with the uncertainties drawn. Each piece is run here by hand so that its inputs and outputs can be inspected. The [method page](../user-guide/method.qmd) explains the equations.
 
 ## Load the record
 
@@ -48,7 +48,7 @@ fines = np.loadtxt("data/B-20_fines.csv", delimiter=",", skiprows=1)
 soil = dp.SoilProfile(mudline=-50.0, elevation=fines[:, 0], fines=fines[:, 1])
 ```
 
-## Stage 1: the capacity target
+## The capacity target
 
 `prepare_target` applies the recalibrated Danish formula to each foot, smooths the result with a Savitzky-Golay filter, anchors the final foot to its unsmoothed value, and extends the elevation range up to the mudline.
 
@@ -70,8 +70,13 @@ ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
-## Stage 2: the unlogged top segment
-The pile passed through 32 ft of soil before the inspector started logging. `sweep_top_phi` assigns a constant friction angle to that segment, runs the characterization for each value from 25 to 45 degrees, and records the root-mean-square misfit between the modeled and target capacities over the logged feet.
+## The characterization pass
+
+Everything after the target is built from one operation, the sequential implicit characterization in `run_drive`. It takes the target and a friction angle for the unlogged top segment, steps down the pile one logged foot at a time, and returns a per-foot soil profile together with the misfit between the modeled and target capacities. The next three sections repeat it to bound the top segment, inspect one pass foot by foot, and propagate the uncertainties through the model.
+
+## The unlogged top segment
+
+In the example pile pile passed through 32 ft of soil before energy and penetration resistance were recorded. The log says nothing about that soil directly, but the fit below it does, because the shaft resistance of the top segment is subtracted from the target at every logged foot. `sweep_top_phi` assigns a constant friction angle to the segment, runs one characterization pass for each value from 25 to 45 degrees, and records the root-mean-square misfit of each pass over the logged feet. Each point on the curve below is one full pass.
 
 ```{python}
 band = dp.sweep_top_phi(target)
@@ -88,19 +93,18 @@ ax.set_ylabel("RMS misfit (kips)")
 ax.grid(True, alpha=0.3)
 plt.show()
 ```
-<!-- Reword: log cannot distinguish -->
-Within the shaded band, the sequential implicit characterization (next section) is able to find equally valid solutions for soil friction angle throughout the log.
-In a deterministic analysis, the lowest valid friction angle is selected for the long-term capacity estimate.
-In the probabilistic analysis, each realization draws randomply from the entire shaded band.
 
-## Stage 3: sequential implicit characterization
+Within the shaded band, the pass finds equally valid friction angle profiles throughout the log. The deterministic analysis uses the lowest admissible angle for the long-term capacity estimate by default. The probabilistic analysis draws each realization's angle from the whole band.
 
-`run_drive` characterizes each logged foot in sequence from the toe resistance the target demands after subtracting the shaft resistance of the feet above in their current state. At each foot the friction angle required to produce the toe resistance and the toe pore-pressure ratio are found iteratively, since each depends on the other. The blows also affect the pore pressure in the soil above the toe, updating the shaft resistance state for the next characterization in the foot-by-foot sequence.
+## Inside one characterization pass
+
+Within a pass, `run_drive` characterizes each logged foot in sequence from the toe resistance the target demands after subtracting the shaft resistance of the feet above in their current state. At each foot the friction angle and the toe pore-pressure ratio are solved together to self-consistency, since each depends on the other. The blows of that foot also raise the pore pressure of the soil above the toe, so the shaft resistance those feet contribute keeps changing for every later foot in the sequence.
+
+In the result shown below, the characterization pass matches the smoothed target with liquefaction of nearly the entire soil profile.
 
 ```{python}
-result = dp.run_drive(target, top_phi=band.lo)
+result = dp.run_drive(target, top_phi=band.hi)
 print(f"RMS misfit {result.rms_kips:.1f} kips")
-print("outcome codes:", result.reason_counts())
 print(f"{100 * result.fraction_liquefied():.0f}% of the logged feet liquefied during the drive")
 ```
 
@@ -116,21 +120,7 @@ result.plot_profile()
 plt.show()
 ```
 
-The per-foot arrays are plain NumPy arrays on the result:
-
-```{python}
-logged = result.logged
-np.column_stack([
-    result.elevation[logged][:8],
-    result.phi[logged][:8].round(1),
-    result.n160[logged][:8].round(0),
-    result.felt[logged][:8].round(0),
-    result.cycles_to_liq[logged][:8].round(0),
-    result.ru[logged][:8].round(2),
-])
-```
-
-## Stage 4: long-term capacity
+## Long-term capacity
 
 The long-term capacity is the shaft resistance of every foot after its pore pressure has dissipated plus the toe resistance at the end of the drive. `long_term_capacity` returns the two parts; `run_drive` has already stored them on the result.
 
@@ -147,17 +137,25 @@ ax.plot(result.fs_eod, result.elevation, label="end of drive")
 ax.plot(result.fs_ltc, result.elevation, label="long term")
 ax.set_xlabel("unit shaft resistance (ksf)")
 ax.set_ylabel("elevation (ft)")
-ax.legend(loc="lower right")
+ax.legend(loc="upper right",framealpha=1)
 ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
-## Stage 5: Monte Carlo
+## Monte Carlo
 
-`monte_carlo` repeats the characterization with the five uncertainty sources drawn per realization. The target and the band computed above are passed in so they are not recomputed. A seed makes the run reproducible; the realization limit is lowered here to keep the page quick to build.
+`monte_carlo` repeats the characterization pass once per realization. Each realization draws five uncertain quantities, shown here with their default spreads from `MonteCarloOptions`:
+
+1.  **Capacity formula bias.** One lognormal multiplier on the whole capacity target, mean 1 and coefficient of variation 0.35.
+2.  **Scatter of each foot's capacity.** Normal noise added to every logged foot of the target, with the robust standard deviation of the raw formula capacities about the smoothed target.
+3.  **Friction angle correlation shift.** A uniform shift of up to 2.5 degrees either way in the correlation between friction angle and $N_{1,60}$, which sets the liquefaction resistance and the residual strength of each characterized foot.
+4.  **Cyclic resistance multiplier.** One lognormal multiplier on the cyclic resistance ratio, median 1 and logarithmic standard deviation 0.20, which changes the number of blows each foot can take before it liquefies.
+5.  **Top-segment friction angle.** Uniform over the admissible band found by the sweep above.
+
+Realizations are added in chunks of 100 until the mean long-term capacity is known to within 2 percent at 95 percent confidence, up to 1200 realizations.
 
 ```{python}
-mc_opts = dp.MonteCarloOptions(seed=1, chunk=50, max_realizations=200)
+mc_opts = dp.MonteCarloOptions(seed=1)
 mc = dp.monte_carlo(log, soil, mc_options=mc_opts, target=target, top_band=band)
 mean, half = mc.mean_ci()
 q05, q50, q95 = mc.quantiles([0.05, 0.5, 0.95])
@@ -185,11 +183,11 @@ ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
-## The same in one call
+## Analyze in a single method call
 
-`analyze` runs stages 1 to 4, and stage 5 when asked, and returns them together.
+The `analyze` method performs all of the steps internally and returns the results together. The probabilistic analysis is only performed when requested (by including the optional parameter `run_mc=True`) The default mode is deterministic.
 
 ```{python}
-out = dp.analyze(log, soil)
+out = dp.analyze(log, soil) # include run_mc=True for probabilistic result
 print(out.drive.ltc == result.ltc, out.top_band.lo == band.lo)
 ```

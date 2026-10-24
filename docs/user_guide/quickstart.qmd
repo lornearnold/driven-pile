@@ -13,19 +13,19 @@ mpl.rcParams.update({
 })
 ```
 
-This page runs a deterministic analysis on ten feet of a driving record typed in by hand. The [walkthrough](../examples/walkthrough.qmd) does the same on a full benchmark log and explains each stage.
+This page runs the full analysis on ten feet of a driving record typed in by hand: define the inputs, call `analyze`, and plot the result. The [walkthrough](../examples/walkthrough.qmd) runs each piece of the analysis by hand on a full benchmark log, and the [method page](method.qmd) gives the equations.
 
 ## Inputs
 
-A driving record is the inspector's log: for each foot the pile advanced, the hammer speed in blows per minute and the number of blows it took. The package also needs the pile, the hammer and a description of the ground.
+A driving record requires the hammer energy per blow (usually derived from the number of blows per minute) and the penetration resistance (usually blows per foot). A complete log also includes the hammer and pile characteristics.
 
 ```{python}
 import numpy as np
 import matplotlib.pyplot as plt
 import driven_pile as dp
 
-bpm = np.array([55, 55, 53, 48, 42, 42, 50, 50, 49, 46])
-bpf = np.array([3, 5, 5, 7, 4, 9, 13, 20, 22, 20])
+bpm = np.array([55, 55, 53, 48, 42, 42, 50, 50, 49, 46, 46, 50, 49, 46, 46, 46, 50, 49, 46, 46])
+bpf = np.array([3, 5, 5, 7, 4, 9, 13, 20, 12, 16, 28, 27, 33, 31, 21, 18, 19, 22, 35, 40])
 
 pile = dp.Pile.octagonal(width_in=24, length_ft=60)
 hammer = dp.Hammer(ram_weight=20.0)  # kips
@@ -35,109 +35,92 @@ log = dp.DriveLog.from_arrays(
     hammer,
     bpm=bpm,
     bpf=bpf,
-    depth=np.arange(1, 11),  # ft below the first logged foot
+    depth=np.arange(1, len(bpm)+1),  # ft below the first logged foot
     tip_elevation=-50.0,     # ft, toe elevation at the end of the drive
 )
-```
-
-The stroke, which the capacity formula needs, is derived from the blow rate by free-fall timing.
-
-```{python}
-#| fig-cap: The driving record. Blows per foot as logged, and the stroke derived from the blow rate.
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 4), sharey=True)
-ax1.plot(log.bpf, log.elevation, "o-")
-ax1.set_xlabel("blows per foot")
-ax1.set_ylabel("elevation (ft)")
-ax2.plot(log.stroke, log.elevation, "o-")
-ax2.set_xlabel("stroke (ft)")
-for a in (ax1, ax2):
-    a.grid(True, alpha=0.3)
-plt.show()
 ```
 
 The soil profile gives the mudline, the water table and the fines content. A single fines value makes a uniform profile; a table of elevation versus percent fines is interpolated.
 
 ```{python}
-soil = dp.SoilProfile(mudline=-10.0, water_elevation=-10.0, fines=15.0)
+soil = dp.SoilProfile(mudline=-10.0, water_elevation=0.0, fines=15.0)
 ```
 
-Here the first logged foot is 31 ft below the mudline, so the pile passed through 30 ft of soil that the log says nothing about. The method treats that unlogged top segment separately, as the next steps show.
+Here the first logged foot is 5 ft below the mudline, and the driving log carries no direct information about the resistance of that soil. The analysis bounds the friction angle of that unlogged top segment from its fit to the logged feet.
 
-## The three stages
+## Run the analysis
 
-`prepare_target` turns the log into a capacity target: the recalibrated Danish formula applied to each foot, smoothed, and placed on a one-foot grid that runs from the mudline to the toe.
+`analyze` builds the capacity target from the log, bounds the top-segment friction angle, runs the deterministic analysis at the lowest admissible angle, and, with `run_mc=True`, runs the probabilistic analysis (`run_mc=False` by default). A seed makes the probabilistic result reproducible.
 
 ```{python}
-target = dp.prepare_target(log, soil)
+result = dp.analyze(log, soil)
 ```
 
+
 ```{python}
-#| fig-cap: Formula capacity per foot (points) and the smoothed target (line). The dashed line is the mudline; the grid above the first logged foot has no target.
+#| fig-cap: Capacity at the time of driving. The formula capacity of each logged foot (points) is smoothed into the target (solid line), and the analysis reproduces the target with a modeled capacity (dashed line).
+drive = result.drive
+
 fig, ax = plt.subplots(figsize=(4.5, 5))
-ax.plot(target.raw_capacity, target.elevation, ".", color="gray", label="formula per foot")
-ax.plot(target.capacity, target.elevation, color="C0", label="smoothed target")
-ax.axhline(target.mudline, color="k", lw=0.8, ls="--")
+ax.plot(drive.raw_capacity, drive.elevation, ".", color="gray", label="formula per foot")
+ax.plot(drive.target, drive.elevation, color="C0", label="smoothed target")
+ax.plot(drive.predicted, drive.elevation, "--", color="C1", label="modeled")
 ax.set_xlabel("capacity at time of driving (kips)")
 ax.set_ylabel("elevation (ft)")
-ax.legend(loc="lower left")
+ax.legend(loc="upper right", framealpha=1)
 ax.grid(True, alpha=0.3)
 plt.show()
-```
-
-`sweep_top_phi` tries a constant friction angle for the top segment and keeps the values whose fit to the log is as good as the best one. The admissible band is the range of top-segment friction angles the log cannot distinguish between.
-
-```{python}
-#| fig-cap: Misfit of the characterization versus the assumed top-segment friction angle. The shaded range is the admissible band.
-band = dp.sweep_top_phi(target)
-
-fig, ax = plt.subplots(figsize=(5, 3.5))
-ax.plot(band.phi, band.rms, "o-")
-ax.axvspan(band.lo, band.hi, color="C0", alpha=0.15)
-ax.set_xlabel("top-segment friction angle (deg)")
-ax.set_ylabel("RMS misfit (kips)")
-ax.grid(True, alpha=0.3)
-plt.show()
-```
-
-`run_drive` characterizes each logged foot in sequence, top down, from the toe resistance the target demands, and keeps updating the pore pressure of the feet above as later blows arrive. The deterministic analysis uses the lowest admissible top-segment friction angle.
-
-```{python}
-result = dp.run_drive(target, top_phi=band.lo)
 ```
 
 ## Results
 
+The long-term capacity is the shaft resistance after the pore pressure has dissipated plus the toe resistance at the end of the drive.
 ```{python}
-#| fig-cap: Capacity target and the modeled capacity at the time of driving.
-result.plot_fit()
+result.drive.eod_capacity
+```
+
+The unit shaft resistance of each foot is lower at the end of the drive than after the excess pore pressure has dissipated. The shaded area between the two curves, multiplied by the pile perimeter, is the setup.
+
+```{python}
+#| fig-cap: Unit shaft resistance at the end of the drive and after pore-pressure dissipation. The shaded area is the setup.
+fig, ax = plt.subplots(figsize=(4.5, 5))
+ax.plot(drive.fs_eod, drive.elevation, color="C0", label="end of drive")
+ax.plot(drive.fs_ltc, drive.elevation, color="C1", label="long term")
+ax.fill_betweenx(drive.elevation, drive.fs_eod, drive.fs_ltc, color="C1", alpha=0.25, label="setup")
+ax.set_xlabel("unit shaft resistance (ksf)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="upper right", framealpha=1)
+ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+Summing the unit shaft resistance over the perimeter of each foot, from the mudline down, gives the shaft resistance accumulated above any elevation. The toe resistance is added at the toe, and it is the same in both cases because no toe setup is modeled.
+
+```{python}
+#| fig-cap: Shaft resistance accumulated from the mudline down, at the end of the drive and in the long term, with the toe resistance at the toe elevation.
+perimeter = drive.pile.perimeter  # ft
+shaft_eod = np.nancumsum(drive.fs_eod) * perimeter  # kips, one foot per entry
+shaft_ltc = np.nancumsum(drive.fs_ltc) * perimeter
+
+fig, ax = plt.subplots(figsize=(4.5, 5))
+ax.plot(shaft_eod, drive.elevation, color="C0", label="shaft, end of drive")
+ax.plot(shaft_ltc, drive.elevation, color="C1", label="shaft, long term")
+ax.plot(drive.toe_eod, drive.elevation[-1], "o", color="k", label="toe")
+ax.set_xlabel("resistance accumulated from the mudline (kips)")
+ax.set_ylabel("elevation (ft)")
+ax.legend(loc="upper right", framealpha=1)
+ax.grid(True, alpha=0.3)
 plt.show()
 ```
 
 ```{python}
-#| fig-cap: Friction angle, equivalent blow count and end-of-drive pore-pressure ratio. The dashed line is the top of the logged record.
-result.plot_profile()
-plt.show()
+toe = drive.toe_eod
+rows = [("end of drive", shaft_eod[-1], toe),
+        ("long term", shaft_ltc[-1], toe),
+        ("setup", shaft_ltc[-1] - shaft_eod[-1], 0.0)]
+print(f"{'':14s}{'shaft':>8s}{'toe':>8s}{'total':>8s}   (kips)")
+for name, shaft, toe_part in rows:
+    print(f"{name:14s}{shaft:8.0f}{toe_part:8.0f}{shaft + toe_part:8.0f}")
 ```
 
-The long-term capacity is the shaft resistance after the pore pressure has dissipated plus the toe resistance at the end of the drive. No toe setup is modeled.
-
-```{python}
-print(f"end of drive {result.eod_capacity:.0f} kips")
-print(f"long term    {result.ltc:.0f} kips "
-      f"= shaft {result.ltc_shaft:.0f} + toe {result.toe_eod:.0f}")
-```
-
-Every foot carries an outcome code. `ok` means the toe resistance was reconciled with a friction angle inside the bounds; `above_ceiling` and `below_floor` mean it was pinned at a bound.
-
-```{python}
-result.reason_counts()
-```
-
-## One call
-
-`analyze` runs the same three stages and returns them together, with the Monte Carlo simulation available on request.
-
-```python
-out = dp.analyze(log, soil)            # out.drive, out.top_band
-out = dp.analyze(log, soil, run_mc=True)  # adds out.mc
-```
+The [walkthrough](../examples/walkthrough.qmd) explains each of these results and the intermediate steps that produce them. The [method page](method.qmd) and the [parameters page](parameters.qmd) document the equations and every option.

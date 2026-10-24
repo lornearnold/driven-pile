@@ -60,6 +60,9 @@ class DriveResult:
         Unit shaft resistance after pore-pressure dissipation, ksf.
     target : ndarray
         Capacity target, kips.
+    raw_capacity : ndarray
+        Per-foot capacity from the dynamic formula before smoothing, kips;
+        NaN on the top segment.
     predicted : ndarray
         Modeled capacity at the time of driving, kips.
     top_phi : float
@@ -105,6 +108,7 @@ class DriveResult:
     fs_eod: np.ndarray
     fs_ltc: np.ndarray
     target: np.ndarray
+    raw_capacity: np.ndarray
     predicted: np.ndarray
     top_phi: float
     n_top: int
