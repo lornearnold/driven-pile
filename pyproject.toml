@@ -1,6 +1,6 @@
 [project]
 name = "driven-pile"
-version = "0.1.2"
+dynamic = ["version"]
 description = "Long-term capacity of driven piles from the pile-driving log: a pore-pressure-tracking inversion of blow counts."
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -27,8 +27,11 @@ Repository = "https://github.com/lornearnold/driven-pile"
 Documentation = "https://lornearnold.github.io/driven-pile/"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/driven_pile"]
@@ -36,6 +39,9 @@ packages = ["src/driven_pile"]
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
 docs = ["great-docs", "ipykernel", "matplotlib>=3.8"]
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 [tool.uv.sources]
 great-docs = { git = "https://github.com/posit-dev/great-docs.git" }

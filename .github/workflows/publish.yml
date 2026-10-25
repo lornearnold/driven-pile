@@ -9,8 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
       - run: uv build
+      - name: Check the built version matches the tag
+        run: |
+          test -f "dist/driven_pile-${GITHUB_REF_NAME#v}-py3-none-any.whl" \
+            || { echo "built $(ls dist) but the tag is $GITHUB_REF_NAME"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: dist

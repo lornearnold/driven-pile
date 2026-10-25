@@ -16,7 +16,7 @@ Last updated 2026-10-23.
    - 83 tests pass; lint is clean.
 
 6. **Documentation** (2026-10-23), built with great-docs from the main branch (`uv sync --group docs`; the released 0.17.0 does not yet know the `docs/` layout) and Quarto. docs/great-docs.yml configures the site; docs/user_guide/ holds installation, quickstart (ten hand-typed feet, deterministic, min_feet lowered to 10), method (Eq. 1 to 10 mapped to functions) and parameters (every option with default and source, and the Eq. 5 interface-angle discrepancy noted); docs/examples/walkthrough.qmd steps through the target, the top-segment sweep, one characterization pass, the long-term capacity and the Monte Carlo on pile B-20 from CSVs in docs/examples/data/. The equation-level functions are in the API reference by dotted name. The marimo notebook of the original plan is deferred; the example is a Quarto notebook for now (Lorne, 2026-10-23). .github/workflows/docs.yml builds and publishes to GitHub Pages. docs/_freeze/ caches executed cells and is committed per the great-docs layout.
-7. **Release scaffolding** (2026-10-23). Version 0.1.0; .github/workflows/publish.yml builds with `uv build` and uploads to PyPI through trusted publishing when a GitHub release is published. Zenodo DOI and the manuscript's data availability line are skipped for now (Lorne, 2026-10-23).
+7. **Release** (2026-10-23, versioning revised 2026-10-25). The version comes from the git tag through hatch-vcs; pyproject.toml declares it dynamic and `__version__` reads the installed metadata, so no file holds a version number. A release is `gh release create vX.Y.Z --generate-notes`. .github/workflows/publish.yml builds with `uv build` from a full-history checkout, fails if the wheel version differs from the tag, and uploads to PyPI through trusted publishing. History: v0.1.0 and v0.1.2 are on PyPI; the v0.1.1 release built a second 0.1.0 because pyproject.toml had not been bumped, and PyPI rejected it. The 0.1.2 upload reports `__version__` as 0.1.0 because `__init__.py` had not been bumped either. The next release is v0.1.3. Zenodo DOI and the manuscript's data availability line are skipped for now (Lorne, 2026-10-23).
 
 ## Uncommitted
 
@@ -36,9 +36,8 @@ Earlier, also uncommitted: the API revision of 2026-10-23 (design decision 8): `
 
 ## Next phases
 
-8. **Publish 0.1.0.** On PyPI, add a trusted publisher for lornearnold/driven-pile, workflow publish.yml, environment `pypi`; on GitHub, create the `pypi` environment, enable Pages from GitHub Actions, then tag and publish a v0.1.0 release. The install line in docs/user_guide/installation.qmd assumes the package is on PyPI.
-9. **Rewire the research repository** to depend on this package (uv path source first, PyPI later), rerun run_drive_model.py and run_mc_ltc.py, confirm the numbers, regenerate the manuscript figures, then archive the superseded modules (src/pile/drive_model.py, liquefaction.py, soil_capacity.py, soil_inversion.py).
-10. **Later.** Zenodo DOI, the manuscript's data availability statement, a marimo version of the walkthrough (`_mo.py` suffix). Planned features are in llm/roadmap.md.
+8. **Rewire the research repository** to depend on this package (uv path source first, PyPI later), rerun run_drive_model.py and run_mc_ltc.py, confirm the numbers, regenerate the manuscript figures, then archive the superseded modules (src/pile/drive_model.py, liquefaction.py, soil_capacity.py, soil_inversion.py).
+9. **Later.** Zenodo DOI, the manuscript's data availability statement, a marimo version of the walkthrough (`_mo.py` suffix). Planned features are in llm/roadmap.md.
 
 ## Regenerating fixtures
 

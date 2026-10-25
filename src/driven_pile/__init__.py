@@ -7,6 +7,8 @@ that foot's shaft resistance for the rest of the drive, and the end-of-drive
 characterization with pore pressure dissipated gives the long-term capacity.
 """
 
+from importlib.metadata import version as _version
+
 from .analysis import analyze
 from .capacity import long_term_capacity
 from .characterization import run_drive
@@ -17,7 +19,7 @@ from .preprocess import Target, prepare_target
 from .results import Analysis, DriveResult, MonteCarloResult, TopPhiBand
 from .top_segment import sweep_top_phi
 
-__version__ = "0.1.0"
+__version__ = _version("driven-pile")
 
 __all__ = [
     "Analysis", "DriveLog", "DriveResult", "Hammer", "ModelOptions",
