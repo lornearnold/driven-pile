@@ -1,6 +1,6 @@
 [project]
 name = "driven-pile"
-version = "0.1.0"
+version = "0.1.1"
 description = "Long-term capacity of driven piles from the pile-driving log: a pore-pressure-tracking inversion of blow counts."
 readme = "README.md"
 license = "GPL-3.0-or-later"
